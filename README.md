@@ -29,6 +29,7 @@ New features added:
 - Dashboard now shows totals by category and a 6-month monthly summary
 - Add Transaction form accepts date and category
  - Dark mode (toggle in the header) — preference is persisted to localStorage
+ - New `account` field for transactions (e.g. ABCBank, CreditCardA). Dashboard shows totals by account and Add form lets you select an account.
 
 Next steps (optional)
 - Persist transactions to localStorage or a backend

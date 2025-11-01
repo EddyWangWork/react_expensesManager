@@ -43,6 +43,8 @@ const NavBar = () => {
                         <nav className="flex items-center gap-3">
                             <NavLink to="/" className={linkClass}>Dashboard</NavLink>
                             <NavLink to="/transactions" className={linkClass}>Transactions</NavLink>
+                            <NavLink to="/categories" className={linkClass}>Categories</NavLink>
+                            <NavLink to="/accounts" className={linkClass}>Accounts</NavLink>
                             <NavLink to="/add" className={linkClass}>Add</NavLink>
                             <NavLink to="/about" className={linkClass}>About</NavLink>
                         </nav>

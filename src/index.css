@@ -114,3 +114,49 @@ body,
 .dark .brand {
     @apply text-indigo-300;
 }
+
+/* Modal animations and helpers */
+@layer components {
+    .modal-backdrop {
+        @apply absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity;
+    }
+
+    @keyframes modal-pop {
+        0% {
+            opacity: 0;
+            transform: translateY(8px) scale(0.98);
+        }
+
+        100% {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+
+    .modal-panel {
+        animation: modal-pop 200ms cubic-bezier(.2, .9, .2, 1) both;
+    }
+
+    .modal-header-gradient {
+        background-image: linear-gradient(90deg, rgba(99, 102, 241, 0.06), rgba(99, 102, 241, 0.02));
+    }
+
+
+    /* badges and row hover for tables */
+    .badge {
+        @apply inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+    }
+
+    .badge-credit {
+        @apply badge bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300;
+    }
+
+    .badge-debit {
+        @apply badge bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300;
+    }
+
+    .row-hover:hover {
+        @apply bg-slate-50 dark:bg-slate-800;
+    }
+
+}

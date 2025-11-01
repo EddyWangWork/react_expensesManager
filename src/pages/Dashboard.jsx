@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTransactions } from '../context/TransactionsContext'
 import { useUI } from '../context/UIContext'
+import { AreaChart, DonutChart, HorizontalBarChart } from '../components/Charts'
 
 export default function Dashboard() {
     const { state, totals, dispatch } = useTransactions()
@@ -9,13 +10,62 @@ export default function Dashboard() {
     const { openAddModal, openAccountModal, openCategoryModal, showNotification } = useUI()
     const [query, setQuery] = useState('')
     const [typeFilter, setTypeFilter] = useState('all')
+    const [selectedYear, setSelectedYear] = useState('all')
+    const [selectedMonth, setSelectedMonth] = useState('all')
+    const [sortBy, setSortBy] = useState('date_desc')
     const [pageSize] = useState(8)
     const [page, setPage] = useState(1)
 
-    const topCategories = Object.entries(totals.totalsByCategory || {}).map(([cat, v]) => ({
-        name: cat,
-        net: (v.credit || 0) - (v.debit || 0)
-    })).sort((a, b) => Math.abs(b.net) - Math.abs(a.net)).slice(0, 6)
+    // We'll compute dashboard-wide totals from the active filtered transactions so
+    // the year/month/type/query filters apply to charts and summaries too.
+    const computeTotalsFromTxs = (txs = []) => {
+        const totalsByCategory = {}
+        const totalsByAccount = {}
+        let credit = 0, debit = 0
+
+        for (const t of txs) {
+            const amt = Number(t.amount || 0)
+            if (t.type === 'credit') credit += amt
+            else debit += amt
+
+            const cat = t.category || 'Uncategorized'
+            totalsByCategory[cat] = totalsByCategory[cat] || { credit: 0, debit: 0 }
+            if (t.type === 'credit') totalsByCategory[cat].credit += amt
+            else totalsByCategory[cat].debit += amt
+
+            const acc = t.account || 'Unknown'
+            totalsByAccount[acc] = totalsByAccount[acc] || { credit: 0, debit: 0 }
+            if (t.type === 'credit') totalsByAccount[acc].credit += amt
+            else totalsByAccount[acc].debit += amt
+        }
+
+        const balance = credit - debit
+
+        // monthly summary for the last 6 months (by year-month)
+        const now = new Date()
+        const months = []
+        for (let i = 5; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+            months.push({ key, monthLabel: d.toLocaleString(undefined, { month: 'short', year: 'numeric' }), credit: 0, debit: 0, balance: 0 })
+        }
+        const monthMap = Object.fromEntries(months.map(m => [m.key, m]))
+        for (const t of txs) {
+            const d = new Date(t.date)
+            if (isNaN(d)) continue
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+            if (monthMap[key]) {
+                const amt = Number(t.amount || 0)
+                if (t.type === 'credit') monthMap[key].credit += amt
+                else monthMap[key].debit += amt
+                monthMap[key].balance = monthMap[key].credit - monthMap[key].debit
+            }
+        }
+
+        const monthlySummary = months.map(m => ({ month: m.monthLabel, credit: m.credit, debit: m.debit, balance: m.balance }))
+
+        return { credit, debit, balance, totalsByCategory, totalsByAccount, monthlySummary }
+    }
 
     const sparkline = (values = []) => {
         const w = 140, h = 36, pad = 4
@@ -54,14 +104,37 @@ export default function Dashboard() {
         URL.revokeObjectURL(url)
     }
 
-    const filteredTxs = useMemo(() => {
+    const activeTxs = useMemo(() => {
         const q = (query || '').toLowerCase().trim()
-        return (state.transactions || []).filter(t => {
+        const all = (state.transactions || []).slice()
+        const res = all.filter(t => {
+            // type filter
             if (typeFilter !== 'all' && t.type !== typeFilter) return false
+            // year/month filter
+            if (selectedYear !== 'all' || selectedMonth !== 'all') {
+                const d = new Date(t.date)
+                if (selectedYear !== 'all' && String(d.getFullYear()) !== String(selectedYear)) return false
+                if (selectedMonth !== 'all' && String(d.getMonth()) !== String(selectedMonth)) return false
+            }
+            // text query
             if (!q) return true
             return String(t.description || '').toLowerCase().includes(q) || String(t.category || '').toLowerCase().includes(q) || String(t.account || '').toLowerCase().includes(q)
-        }).slice(0, 50)
-    }, [state.transactions, query, typeFilter])
+        })
+
+        // sorting
+        res.sort((a, b) => {
+            if (sortBy === 'date_desc') return new Date(b.date) - new Date(a.date)
+            if (sortBy === 'date_asc') return new Date(a.date) - new Date(b.date)
+            if (sortBy === 'amount_desc') return Number(b.amount) - Number(a.amount)
+            if (sortBy === 'amount_asc') return Number(a.amount) - Number(b.amount)
+            return 0
+        })
+
+        return res
+    }, [state.transactions, query, typeFilter, selectedYear, selectedMonth, sortBy])
+
+    // derive visible (paginated) list from activeTxs
+    const filteredTxs = useMemo(() => activeTxs.slice(0, 50), [activeTxs])
 
     const visibleTxs = filteredTxs.slice(0, pageSize * page)
 
@@ -78,6 +151,15 @@ export default function Dashboard() {
         showNotification && showNotification({ message: `Deleted ${tx.description}`, actionLabel: 'Undo', action: () => dispatch({ type: 'restore', payload: prev }) })
     }
 
+    // derive totals and summaries from the filtered (active) transactions so the
+    // entire dashboard reflects the UI filters (year/month/type/query)
+    const activeTotals = useMemo(() => computeTotalsFromTxs(activeTxs), [activeTxs])
+
+    const topCategories = Object.entries(activeTotals.totalsByCategory || {}).map(([cat, v]) => ({
+        name: cat,
+        net: (v.credit || 0) - (v.debit || 0)
+    })).sort((a, b) => Math.abs(b.net) - Math.abs(a.net)).slice(0, 6)
+
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -93,18 +175,18 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="card text-center">
                     <div className="text-sm muted">Total Credit</div>
-                    <div className="text-2xl font-bold text-green-600 mt-2">${totals.credit.toFixed(2)}</div>
-                    <div className="mt-3">{sparkline(totals.monthlySummary.map(m => m.credit))}</div>
+                    <div className="text-2xl font-bold text-green-600 mt-2">${activeTotals.credit.toFixed(2)}</div>
+                    <div className="mt-3">{sparkline(activeTotals.monthlySummary.map(m => m.credit))}</div>
                 </div>
                 <div className="card text-center">
                     <div className="text-sm muted">Total Debit</div>
-                    <div className="text-2xl font-bold text-red-600 mt-2">${totals.debit.toFixed(2)}</div>
-                    <div className="mt-3">{sparkline(totals.monthlySummary.map(m => -m.debit))}</div>
+                    <div className="text-2xl font-bold text-red-600 mt-2">${activeTotals.debit.toFixed(2)}</div>
+                    <div className="mt-3">{sparkline(activeTotals.monthlySummary.map(m => -m.debit))}</div>
                 </div>
                 <div className="card text-center">
                     <div className="text-sm muted">Balance</div>
-                    <div className="text-2xl font-bold mt-2">${totals.balance.toFixed(2)}</div>
-                    <div className="mt-3">{sparkline(totals.monthlySummary.map(m => m.balance))}</div>
+                    <div className="text-2xl font-bold mt-2">${activeTotals.balance.toFixed(2)}</div>
+                    <div className="mt-3">{sparkline(activeTotals.monthlySummary.map(m => m.balance))}</div>
                 </div>
             </div>
 
@@ -133,6 +215,38 @@ export default function Dashboard() {
                                 <option value="all">All</option>
                                 <option value="debit">Debit</option>
                                 <option value="credit">Credit</option>
+                            </select>
+
+                            {/* Year filter */}
+                            <select aria-label="Filter by year" value={selectedYear} onChange={e => setSelectedYear(e.target.value)} className="border rounded px-2 py-1 text-sm">
+                                <option value="all">All years</option>
+                                {
+                                    // derive years from transactions
+                                    Array.from(new Set((state.transactions || []).map(t => {
+                                        const d = new Date(t.date)
+                                        return isNaN(d.getFullYear()) ? null : String(d.getFullYear())
+                                    }).filter(Boolean))).sort((a, b) => Number(b) - Number(a)).map(y => (
+                                        <option key={y} value={y}>{y}</option>
+                                    ))
+                                }
+                            </select>
+
+                            {/* Month filter */}
+                            <select aria-label="Filter by month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="border rounded px-2 py-1 text-sm">
+                                <option value="all">All months</option>
+                                {
+                                    ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map((m, idx) => (
+                                        <option key={m} value={String(idx)}>{m}</option>
+                                    ))
+                                }
+                            </select>
+
+                            {/* Sorting */}
+                            <select aria-label="Sort transactions" value={sortBy} onChange={e => setSortBy(e.target.value)} className="border rounded px-2 py-1 text-sm">
+                                <option value="date_desc">Date ↓</option>
+                                <option value="date_asc">Date ↑</option>
+                                <option value="amount_desc">Amount ↓</option>
+                                <option value="amount_asc">Amount ↑</option>
                             </select>
 
                             <button onClick={() => exportCSV(filteredTxs)} className="btn btn-ghost btn-sm" title="Export CSV">Export</button>
@@ -174,12 +288,31 @@ export default function Dashboard() {
 
                 <div className="space-y-6">
                     <div className="card-lg">
+                        <h3 className="text-lg font-medium mb-3">Charts</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <div className="text-sm muted mb-2">Balance (spark)</div>
+                                <AreaChart values={activeTotals.monthlySummary.map(m => m.balance)} width={220} height={70} />
+                            </div>
+
+                            <div>
+                                <div className="text-sm muted mb-2">Top Categories</div>
+                                <DonutChart items={topCategories.map(t => ({ label: t.name, value: Math.abs(t.net) }))} size={120} thickness={16} />
+                            </div>
+
+                            <div>
+                                <div className="text-sm muted mb-2">Accounts</div>
+                                <HorizontalBarChart items={Object.entries(activeTotals.totalsByAccount || {}).map(([k, v]) => ({ label: k, value: (v.credit || 0) - (v.debit || 0) }))} maxWidth={160} />
+                            </div>
+                        </div>
+                    </div>
+                    <div className="card-lg">
                         <div className="flex items-center justify-between mb-3">
                             <h3 className="text-lg font-medium">Top Categories</h3>
                         </div>
                         {/* Top categories ranked */}
                         {(() => {
-                            const all = Object.entries(totals.totalsByCategory || {}).map(([cat, v]) => ({ name: cat, net: (v.credit || 0) - (v.debit || 0) }))
+                            const all = Object.entries(activeTotals.totalsByCategory || {}).map(([cat, v]) => ({ name: cat, net: (v.credit || 0) - (v.debit || 0) }))
                             const sorted = all.sort((a, b) => Math.abs(b.net) - Math.abs(a.net)).slice(0, 6)
                             const max = Math.max(1, ...sorted.map(s => Math.abs(s.net)))
                             return (
@@ -208,10 +341,10 @@ export default function Dashboard() {
                             <h3 className="text-lg font-medium">Totals by Category</h3>
                         </div>
                         <div className="divide-y">
-                            {Object.entries(totals.totalsByCategory || {}).map(([cat, vals]) => {
+                            {Object.entries(activeTotals.totalsByCategory || {}).map(([cat, vals]) => {
                                 const net = vals.credit - vals.debit
                                 const netClass = net >= 0 ? 'text-green-600' : 'text-red-600'
-                                const pct = Math.min(100, Math.abs(net) / (Math.max(1, totals.balance || 1)) * 100)
+                                const pct = Math.min(100, Math.abs(net) / (Math.max(1, activeTotals.balance || 1)) * 100)
                                 return (
                                     <div key={cat} className="flex items-center justify-between py-3">
                                         <div className="flex-1 pr-4">
@@ -231,7 +364,7 @@ export default function Dashboard() {
                             <h3 className="text-lg font-medium">Totals by Account</h3>
                         </div>
                         <div className="divide-y">
-                            {Object.entries(totals.totalsByAccount || {}).map(([acc, vals]) => {
+                            {Object.entries(activeTotals.totalsByAccount || {}).map(([acc, vals]) => {
                                 const net = vals.credit - vals.debit
                                 const netClass = net >= 0 ? 'text-green-600' : 'text-red-600'
                                 const starting = state.accounts && state.accounts[acc] ? Number(state.accounts[acc]) : 0
@@ -256,14 +389,14 @@ export default function Dashboard() {
                     <div className="card-lg">
                         <h3 className="text-lg font-medium mb-3">Monthly Summary (last 6 months)</h3>
                         <ul className="space-y-3">
-                            {totals.monthlySummary.map(m => (
+                            {activeTotals.monthlySummary.map(m => (
                                 <li key={m.month} className="flex items-center gap-4">
                                     <div className="w-20 muted">{m.month}</div>
                                     <div className="flex-1 flex items-center gap-3">
                                         <div className="text-sm text-green-600">+${m.credit.toFixed(0)}</div>
                                         <div className="text-sm text-red-600">-${m.debit.toFixed(0)}</div>
                                         <div className="flex-1 bg-gray-100 h-2 rounded overflow-hidden">
-                                            <div style={{ width: `${Math.min(100, Math.abs(m.balance) / (Math.max(1, totals.credit) / 5) * 100)}%` }} className={`h-2 ${m.balance >= 0 ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                                            <div style={{ width: `${Math.min(100, Math.abs(m.balance) / (Math.max(1, activeTotals.credit) / 5) * 100)}%` }} className={`h-2 ${m.balance >= 0 ? 'bg-green-500' : 'bg-red-500'}`}></div>
                                         </div>
                                         <div className="text-sm font-medium w-20 text-right">${m.balance.toFixed(0)}</div>
                                     </div>

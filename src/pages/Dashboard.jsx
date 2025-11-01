@@ -16,6 +16,9 @@ export default function Dashboard() {
     const [pageSize] = useState(8)
     const [page, setPage] = useState(1)
 
+    const CREDIT_TYPES = ['credit', 'transfer_in']
+    const DEBIT_TYPES = ['debit', 'transfer_out']
+
     // We'll compute dashboard-wide totals from the active filtered transactions so
     // the year/month/type/query filters apply to charts and summaries too.
     const computeTotalsFromTxs = (txs = []) => {
@@ -25,17 +28,17 @@ export default function Dashboard() {
 
         for (const t of txs) {
             const amt = Number(t.amount || 0)
-            if (t.type === 'credit') credit += amt
+            if (CREDIT_TYPES.includes(t.type)) credit += amt
             else debit += amt
 
             const cat = t.category || 'Uncategorized'
             totalsByCategory[cat] = totalsByCategory[cat] || { credit: 0, debit: 0 }
-            if (t.type === 'credit') totalsByCategory[cat].credit += amt
+            if (CREDIT_TYPES.includes(t.type)) totalsByCategory[cat].credit += amt
             else totalsByCategory[cat].debit += amt
 
             const acc = t.account || 'Unknown'
             totalsByAccount[acc] = totalsByAccount[acc] || { credit: 0, debit: 0 }
-            if (t.type === 'credit') totalsByAccount[acc].credit += amt
+            if (CREDIT_TYPES.includes(t.type)) totalsByAccount[acc].credit += amt
             else totalsByAccount[acc].debit += amt
         }
 
@@ -56,7 +59,7 @@ export default function Dashboard() {
             const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
             if (monthMap[key]) {
                 const amt = Number(t.amount || 0)
-                if (t.type === 'credit') monthMap[key].credit += amt
+                if (CREDIT_TYPES.includes(t.type)) monthMap[key].credit += amt
                 else monthMap[key].debit += amt
                 monthMap[key].balance = monthMap[key].credit - monthMap[key].debit
             }
@@ -194,6 +197,8 @@ export default function Dashboard() {
                     <option value="all">All</option>
                     <option value="debit">Debit</option>
                     <option value="credit">Credit</option>
+                    <option value="transfer_in">Transfer In</option>
+                    <option value="transfer_out">Transfer Out</option>
                 </select>
 
                 {/* Year filter */}
@@ -272,7 +277,7 @@ export default function Dashboard() {
                                     <div className="muted text-sm">{tx.date} · {tx.type} · {tx.account}</div>
                                 </div>
                                 <div className="flex items-center gap-4">
-                                    <div className={`font-semibold ${tx.type === 'credit' ? 'text-green-600' : 'text-red-600'}`}>${Number(tx.amount).toFixed(2)}</div>
+                                    <div className={`font-semibold ${CREDIT_TYPES.includes(tx.type) ? 'text-green-600' : 'text-red-600'}`}>${Number(tx.amount).toFixed(2)}</div>
                                     <div className="text-xs muted">Bal: ${totals.runningBalances && totals.runningBalances[tx.id] != null ? Number(totals.runningBalances[tx.id]).toFixed(2) : '-'}</div>
                                     <div className="flex items-center gap-2">
                                         <button onClick={() => onEditTx(tx)} className="btn btn-ghost btn-sm">Edit</button>

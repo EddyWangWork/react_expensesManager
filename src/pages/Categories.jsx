@@ -6,6 +6,9 @@ export default function Categories() {
     const { state, totals } = useTransactions()
     const { openCategoryModal } = useUI()
 
+    const CREDIT_TYPES = ['credit', 'transfer_in']
+    const DEBIT_TYPES = ['debit', 'transfer_out']
+
     // build categories set: union of state.categories and categories from transactions
     const catSet = new Set(Object.keys(state.categories || {}))
     for (const t of (state.transactions || [])) {
@@ -23,7 +26,7 @@ export default function Categories() {
     const renderCategory = (name) => {
         const children = categories[name] || []
         const txs = (state.transactions || []).filter(t => (t.category || 'Uncategorized') === name)
-        const total = txs.reduce((s, t) => t.type === 'credit' ? s + Number(t.amount || 0) : s - Number(t.amount || 0), 0)
+        const total = txs.reduce((s, t) => (CREDIT_TYPES.includes(t.type) ? s + Number(t.amount || 0) : s - Number(t.amount || 0)), 0)
         return (
             <div key={name} className="card">
                 <div className="flex items-center justify-between">
@@ -83,7 +86,7 @@ export default function Categories() {
                 {(categories[null] || []).map(name => {
                     const children = categories[name] || []
                     const txs = (state.transactions || []).filter(t => (t.category || 'Uncategorized') === name)
-                    const total = txs.reduce((s, t) => t.type === 'credit' ? s + Number(t.amount || 0) : s - Number(t.amount || 0), 0)
+                    const total = txs.reduce((s, t) => (CREDIT_TYPES.includes(t.type) ? s + Number(t.amount || 0) : s - Number(t.amount || 0)), 0)
                     return (
                         <div key={name} className="card">
                             <div className="flex items-center justify-between">
@@ -103,7 +106,7 @@ export default function Categories() {
                                     <div className="grid gap-2">
                                         {children.map(cn => {
                                             const ctxs = (state.transactions || []).filter(t => (t.category || 'Uncategorized') === cn)
-                                            const ctotal = ctxs.reduce((s, t) => t.type === 'credit' ? s + Number(t.amount || 0) : s - Number(t.amount || 0), 0)
+                                            const ctotal = ctxs.reduce((s, t) => (CREDIT_TYPES.includes(t.type) ? s + Number(t.amount || 0) : s - Number(t.amount || 0)), 0)
                                             return (
                                                 <div key={cn} className="flex items-center justify-between">
                                                     <div className="text-sm">{cn}</div>

@@ -38,10 +38,32 @@ function reducer(state, action) {
     switch (action.type) {
         case 'add':
             return { ...state, transactions: [action.payload, ...state.transactions] }
-        case 'delete':
-            return { ...state, transactions: state.transactions.filter(t => t.id !== action.payload) }
+        case 'addTransfer': {
+            // payload: { items: [txA, txB] }
+            const items = action.payload && action.payload.items ? action.payload.items : []
+            return { ...state, transactions: [...items, ...state.transactions] }
+        }
+        case 'delete': {
+            // payload may be an id (number) or a transferId (string/number)
+            const id = action.payload
+            const tx = (state.transactions || []).find(t => t.id === id)
+            if (tx && tx.transferId) {
+                // delete all transactions with this transferId
+                return { ...state, transactions: state.transactions.filter(t => t.transferId !== tx.transferId) }
+            }
+            return { ...state, transactions: state.transactions.filter(t => t.id !== id) }
+        }
         case 'update':
             return { ...state, transactions: state.transactions.map(t => t.id === action.payload.id ? action.payload : t) }
+        case 'updateTransfer': {
+            // payload: { transferId, items: [txA, txB] }
+            const transferId = action.payload && action.payload.transferId
+            const items = action.payload && action.payload.items ? action.payload.items : []
+            if (!transferId) return state
+            // replace any txs with matching transferId with the new items
+            const others = state.transactions.filter(t => t.transferId !== transferId)
+            return { ...state, transactions: [...items, ...others] }
+        }
         case 'addAccount':
             return { ...state, accounts: { ...(state.accounts || {}), [action.payload.name]: Number(action.payload.balance || 0) } }
         case 'updateAccount':
@@ -133,17 +155,20 @@ export function TransactionsProvider({ children }) {
     }, [state])
 
     const totals = useMemo(() => {
+        const CREDIT_TYPES = ['credit', 'transfer_in']
+        const DEBIT_TYPES = ['debit', 'transfer_out']
+
         const credit = state.transactions
-            .filter(t => t.type === 'credit')
+            .filter(t => CREDIT_TYPES.includes(t.type))
             .reduce((s, t) => s + Number(t.amount || 0), 0)
         const debit = state.transactions
-            .filter(t => t.type === 'debit')
+            .filter(t => DEBIT_TYPES.includes(t.type))
             .reduce((s, t) => s + Number(t.amount || 0), 0)
         // totals by category
         const totalsByCategory = state.transactions.reduce((acc, t) => {
             const cat = t.category || 'Uncategorized'
             acc[cat] = acc[cat] || { credit: 0, debit: 0 }
-            if (t.type === 'credit') acc[cat].credit += Number(t.amount || 0)
+            if (CREDIT_TYPES.includes(t.type)) acc[cat].credit += Number(t.amount || 0)
             else acc[cat].debit += Number(t.amount || 0)
             return acc
         }, {})
@@ -152,7 +177,7 @@ export function TransactionsProvider({ children }) {
         const totalsByAccount = state.transactions.reduce((acc, t) => {
             const accName = t.account || 'Unknown'
             acc[accName] = acc[accName] || { credit: 0, debit: 0 }
-            if (t.type === 'credit') acc[accName].credit += Number(t.amount || 0)
+            if (CREDIT_TYPES.includes(t.type)) acc[accName].credit += Number(t.amount || 0)
             else acc[accName].debit += Number(t.amount || 0)
             return acc
         }, {})
@@ -162,7 +187,7 @@ export function TransactionsProvider({ children }) {
             const d = t.date ? new Date(t.date) : new Date()
             const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
             acc[key] = acc[key] || { credit: 0, debit: 0 }
-            if (t.type === 'credit') acc[key].credit += Number(t.amount || 0)
+            if (CREDIT_TYPES.includes(t.type)) acc[key].credit += Number(t.amount || 0)
             else acc[key].debit += Number(t.amount || 0)
             return acc
         }, {})
@@ -192,7 +217,7 @@ export function TransactionsProvider({ children }) {
             for (const t of txs) {
                 const name = t.account || 'Unassigned'
                 if (accBalances[name] === undefined) accBalances[name] = 0
-                if (t.type === 'credit') accBalances[name] += Number(t.amount || 0)
+                if (CREDIT_TYPES.includes(t.type)) accBalances[name] += Number(t.amount || 0)
                 else accBalances[name] -= Number(t.amount || 0)
                 map[t.id] = accBalances[name]
             }

@@ -9,6 +9,9 @@ export default function AddTransaction({ onClose, editingId: propEditingId, defa
     const [category, setCategory] = useState('General')
     const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
     const [account, setAccount] = useState(defaultAccount || 'ABCBank')
+    const [otherAccount, setOtherAccount] = useState('')
+    const [newOtherAccountName, setNewOtherAccountName] = useState('')
+    const [newOtherAccountBalance, setNewOtherAccountBalance] = useState('0')
     const [newAccountName, setNewAccountName] = useState('')
     const [newAccountBalance, setNewAccountBalance] = useState('0')
     const [categoryMsg, setCategoryMsg] = useState('')
@@ -31,6 +34,11 @@ export default function AddTransaction({ onClose, editingId: propEditingId, defa
                 setCategory(tx.category || 'General')
                 setDate(tx.date || new Date().toISOString().slice(0, 10))
                 setAccount(tx.account || 'ABCBank')
+                // if this transaction is part of a paired transfer, populate otherAccount
+                if (tx.transferId) {
+                    const pair = state.transactions.find(t => t.transferId === tx.transferId && t.id !== tx.id)
+                    if (pair) setOtherAccount(pair.account || '')
+                }
             }
         } else {
             // if opening modal with a defaultAccount, prefill it
@@ -38,16 +46,26 @@ export default function AddTransaction({ onClose, editingId: propEditingId, defa
         }
     }, [editing, editingId, state.transactions])
 
+    // when primary account changes, clear otherAccount if it matches (avoid selecting same account)
+    useEffect(() => {
+        if (otherAccount && account && otherAccount === account) {
+            setOtherAccount('')
+        }
+    }, [account])
+
     const onSubmit = (e) => {
         e.preventDefault()
+        const baseId = Date.now()
+        const normalizedDate = (new Date(date)).toISOString().slice(0, 10)
+
         const payload = {
-            id: Date.now(),
+            id: baseId,
             description: description || 'Untitled',
             amount: parseFloat(amount) || 0,
             type,
             category: category || '',
             // normalize date to YYYY-MM-DD
-            date: (new Date(date)).toISOString().slice(0, 10),
+            date: normalizedDate,
             account: account || 'Unassigned'
         }
         // if creating a new account inline, add it first
@@ -60,6 +78,30 @@ export default function AddTransaction({ onClose, editingId: propEditingId, defa
             const start = parseFloat(newAccountBalance) || 0
             dispatch({ type: 'addAccount', payload: { name, balance: start } })
             payload.account = name
+        }
+
+        // if transfer, handle creating otherAccount inline if requested
+        if ((type === 'transfer_in' || type === 'transfer_out') && otherAccount === '__new__') {
+            const name = newOtherAccountName && newOtherAccountName.trim()
+            if (!name) {
+                alert('Please provide a name for the other account')
+                return
+            }
+            const start = parseFloat(newOtherAccountBalance) || 0
+            dispatch({ type: 'addAccount', payload: { name, balance: start } })
+            setOtherAccount(name)
+        }
+
+        // validate transfer other account
+        if (type === 'transfer_in' || type === 'transfer_out') {
+            if (!otherAccount || otherAccount === '') {
+                alert('Please select the other account for the transfer')
+                return
+            }
+            if (otherAccount === (payload.account || '')) {
+                alert('Source and destination accounts must be different')
+                return
+            }
         }
 
         if (editing) {
@@ -77,7 +119,55 @@ export default function AddTransaction({ onClose, editingId: propEditingId, defa
             } else if (!payload.category) {
                 payload.category = 'Uncategorized'
             }
-            dispatch({ type: 'update', payload })
+            // if editing a transfer (has transferId), update both sides
+            const existing = state.transactions.find(t => t.id === editingId)
+            if (existing && existing.transferId) {
+                const transferId = existing.transferId
+                // build items for both sides
+                const pair = state.transactions.find(t => t.transferId === transferId && t.id !== editingId)
+                const a = { ...payload }
+                const b = pair ? { ...pair } : null
+                // determine accounts/types: if current edited is transfer_in, then pair is transfer_out and vice versa
+                if (type === 'transfer_in') {
+                    a.type = 'transfer_in'
+                    a.account = account
+                    if (b) {
+                        b.type = 'transfer_out'
+                        b.account = otherAccount || b.account
+                        b.description = a.description
+                        b.amount = a.amount
+                        b.category = a.category
+                        b.date = a.date
+                    }
+                } else if (type === 'transfer_out') {
+                    a.type = 'transfer_out'
+                    a.account = account
+                    if (b) {
+                        b.type = 'transfer_in'
+                        b.account = otherAccount || b.account
+                        b.description = a.description
+                        b.amount = a.amount
+                        b.category = a.category
+                        b.date = a.date
+                    }
+                } else {
+                    // not a transfer anymore: just update single
+                    dispatch({ type: 'update', payload: a })
+                    if (onClose) onClose()
+                    else navigate('/transactions')
+                    return
+                }
+                // ensure both have transferId and new ids
+                a.transferId = transferId
+                a.id = editingId
+                if (b) b.transferId = transferId
+                if (b && !b.id) b.id = baseId + 1
+                const items = [a, b].filter(Boolean)
+                dispatch({ type: 'updateTransfer', payload: { transferId, items } })
+            } else {
+                // normal update
+                dispatch({ type: 'update', payload })
+            }
         } else {
             // handle inline new category if present
             if (payload.category === '__new__') {
@@ -91,7 +181,37 @@ export default function AddTransaction({ onClose, editingId: propEditingId, defa
             } else if (!payload.category) {
                 payload.category = 'Uncategorized'
             }
-            dispatch({ type: 'add', payload })
+            if (type === 'transfer_in' || type === 'transfer_out') {
+                // create paired transactions: one transfer_out and one transfer_in
+                const transferId = `tr_${baseId}`
+                // determine roles: account is primary side chosen in form
+                const primaryAccount = account || 'Unassigned'
+                const other = otherAccount || ''
+                // build both transactions
+                const txA = {
+                    id: baseId,
+                    transferId,
+                    description: payload.description,
+                    amount: payload.amount,
+                    type: type === 'transfer_in' ? 'transfer_in' : 'transfer_out',
+                    category: payload.category,
+                    date: normalizedDate,
+                    account: primaryAccount
+                }
+                const txB = {
+                    id: baseId + 1,
+                    transferId,
+                    description: payload.description,
+                    amount: payload.amount,
+                    type: type === 'transfer_in' ? 'transfer_out' : 'transfer_in',
+                    category: payload.category,
+                    date: normalizedDate,
+                    account: other || 'Unassigned'
+                }
+                dispatch({ type: 'addTransfer', payload: { items: [txA, txB] } })
+            } else {
+                dispatch({ type: 'add', payload })
+            }
         }
         if (onClose) onClose()
         else navigate('/transactions')
@@ -171,6 +291,8 @@ export default function AddTransaction({ onClose, editingId: propEditingId, defa
                         <select value={type} onChange={e => setType(e.target.value)} className="mt-2 w-full border rounded-lg px-3 py-2" disabled={mode === 'delete'}>
                             <option value="debit">Debit</option>
                             <option value="credit">Credit</option>
+                            <option value="transfer_in">Transfer In</option>
+                            <option value="transfer_out">Transfer Out</option>
                         </select>
                     </label>
                 </div>
@@ -235,6 +357,32 @@ export default function AddTransaction({ onClose, editingId: propEditingId, defa
                         </div>
                     )}
                 </div>
+
+                {/* Other account for transfers */}
+                {(type === 'transfer_in' || type === 'transfer_out') && (
+                    <div className="mb-4">
+                        <label>
+                            <div className="text-sm muted">Other account</div>
+                            <select value={otherAccount} onChange={e => setOtherAccount(e.target.value)} className="mt-2 w-full border rounded-lg px-3 py-2" disabled={mode === 'delete'}>
+                                <option value="">Select other account</option>
+                                {(state.accounts ? Object.keys(state.accounts).filter(a => a !== account) : []).map(a => (
+                                    <option key={a} value={a}>{a}</option>
+                                ))}
+                                {otherAccount && otherAccount !== '__new__' && otherAccount !== account && !(state.accounts || {})[otherAccount] && (
+                                    <option value={otherAccount}>{otherAccount}</option>
+                                )}
+                                <option value="__new__">+ Add new account...</option>
+                            </select>
+                        </label>
+
+                        {otherAccount === '__new__' && (
+                            <div className="mt-3 grid grid-cols-2 gap-3">
+                                <input placeholder="Other account name" value={newOtherAccountName} onChange={e => setNewOtherAccountName(e.target.value)} className="w-full border rounded-lg px-3 py-2" disabled={mode === 'delete'} />
+                                <input placeholder="Starting balance" value={newOtherAccountBalance} onChange={e => setNewOtherAccountBalance(e.target.value)} className="w-full border rounded-lg px-3 py-2" disabled={mode === 'delete'} />
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 <div className="flex gap-3">
                     {mode === 'delete' ? (

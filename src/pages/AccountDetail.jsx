@@ -27,6 +27,9 @@ export default function AccountDetail() {
     const [startDate, setStartDate] = React.useState(() => initialParams.get('start') || '')
     const [endDate, setEndDate] = React.useState(() => initialParams.get('end') || '')
 
+    const CREDIT_TYPES = ['credit', 'transfer_in']
+    const DEBIT_TYPES = ['debit', 'transfer_out']
+
     // formatter to produce yyyy-mm-dd using local date parts (avoids timezone shifts)
     const fmt = d => {
         const yyyy = d.getFullYear()
@@ -235,6 +238,8 @@ export default function AccountDetail() {
                             <option value="all">All types</option>
                             <option value="debit">Debit</option>
                             <option value="credit">Credit</option>
+                            <option value="transfer_in">Transfer In</option>
+                            <option value="transfer_out">Transfer Out</option>
                         </select>
                         <input placeholder="min" value={minAmount} onChange={e => setMinAmount(e.target.value)} className="border rounded px-2 py-1 w-16 md:w-20" />
                         <input placeholder="max" value={maxAmount} onChange={e => setMaxAmount(e.target.value)} className="border rounded px-2 py-1 w-16 md:w-20" />
@@ -323,10 +328,10 @@ export default function AccountDetail() {
                                                 </div>
                                             </td>
                                             <td className="py-3 text-sm align-middle">
-                                                <span className={t.type === 'credit' ? 'badge-credit' : 'badge-debit'}>{t.type}</span>
+                                                <span className={CREDIT_TYPES.includes(t.type) ? 'badge-credit' : 'badge-debit'}>{t.type}</span>
                                             </td>
                                             <td className="py-3 text-sm text-right align-middle">
-                                                <span className={t.type === 'credit' ? 'text-emerald-600 dark:text-emerald-300 font-medium' : 'text-rose-600 dark:text-rose-300 font-medium'}>{(t.amount || 0).toFixed(2)}</span>
+                                                <span className={CREDIT_TYPES.includes(t.type) ? 'text-emerald-600 dark:text-emerald-300 font-medium' : 'text-rose-600 dark:text-rose-300 font-medium'}>{(t.amount || 0).toFixed(2)}</span>
                                             </td>
                                             <td className="py-3 text-sm text-right align-middle">{(totals.runningBalances && totals.runningBalances[t.id] !== undefined) ? totals.runningBalances[t.id].toFixed(2) : '-'}</td>
                                             <td className="py-3 text-sm text-right align-middle">
@@ -368,10 +373,10 @@ export default function AccountDetail() {
                                                             </div>
                                                         </td>
                                                         <td className="py-3 text-sm align-middle">
-                                                            <span className={t.type === 'credit' ? 'badge-credit' : 'badge-debit'}>{t.type}</span>
+                                                            <span className={CREDIT_TYPES.includes(t.type) ? 'badge-credit' : 'badge-debit'}>{t.type}</span>
                                                         </td>
                                                         <td className="py-3 text-sm text-right align-middle">
-                                                            <span className={t.type === 'credit' ? 'text-emerald-600 dark:text-emerald-300 font-medium' : 'text-rose-600 dark:text-rose-300 font-medium'}>{(t.amount || 0).toFixed(2)}</span>
+                                                            <span className={CREDIT_TYPES.includes(t.type) ? 'text-emerald-600 dark:text-emerald-300 font-medium' : 'text-rose-600 dark:text-rose-300 font-medium'}>{(t.amount || 0).toFixed(2)}</span>
                                                         </td>
                                                         <td className="py-3 text-sm text-right align-middle">{(totals.runningBalances && totals.runningBalances[t.id] !== undefined) ? totals.runningBalances[t.id].toFixed(2) : '-'}</td>
                                                         <td className="py-3 text-sm text-right align-middle">
@@ -388,8 +393,8 @@ export default function AccountDetail() {
                                                     <td colSpan={3} className="py-2 text-sm font-medium">Day totals</td>
                                                     <td className="py-2 text-sm text-right">
                                                         {(() => {
-                                                            const credit = items.filter(it => it.type === 'credit').reduce((s, it) => s + Number(it.amount || 0), 0)
-                                                            const debit = items.filter(it => it.type === 'debit').reduce((s, it) => s + Number(it.amount || 0), 0)
+                                                            const credit = items.filter(it => CREDIT_TYPES.includes(it.type)).reduce((s, it) => s + Number(it.amount || 0), 0)
+                                                            const debit = items.filter(it => DEBIT_TYPES.includes(it.type)).reduce((s, it) => s + Number(it.amount || 0), 0)
                                                             return (
                                                                 <div className="text-sm">
                                                                     <div className="text-emerald-600 font-medium">+{credit.toFixed(2)}</div>

@@ -19,7 +19,7 @@ import Categories from './pages/Categories'
 import CategoryEditor from './pages/CategoryEditor'
 
 function AppInner() {
-    const { modalOpen, modalEditId, modalDefaultAccount, closeModal } = useUI()
+    const { modalOpen, modalEditId, modalDefaultAccount, modalAction, closeModal } = useUI()
     const loc = useLocation()
     const navigate = useNavigate()
     const { openAddModal } = useUI()
@@ -93,8 +93,8 @@ function AppInner() {
                 </main>
 
                 {modalOpen && (
-                    <Modal onClose={closeModal} title={modalEditId ? 'Edit Transaction' : 'Add Transaction'}>
-                        <AddTransaction onClose={closeModal} editingId={modalEditId} defaultAccount={modalDefaultAccount} />
+                    <Modal onClose={closeModal} title={modalAction === 'delete' ? 'Delete Transaction' : (modalEditId ? 'Edit Transaction' : 'Add Transaction')}>
+                        <AddTransaction onClose={closeModal} editingId={modalEditId} defaultAccount={modalDefaultAccount} mode={modalAction} />
                     </Modal>
                 )}
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTransactions } from '../context/TransactionsContext'
 
-export default function AddTransaction({ onClose, editingId: propEditingId, defaultAccount }) {
+export default function AddTransaction({ onClose, editingId: propEditingId, defaultAccount, mode }) {
     const [description, setDescription] = useState('')
     const [amount, setAmount] = useState('')
     const [type, setType] = useState('debit')
@@ -97,9 +97,9 @@ export default function AddTransaction({ onClose, editingId: propEditingId, defa
         else navigate('/transactions')
     }
 
-    const onDelete = () => {
+    const onDelete = (skipConfirm = false) => {
         if (!editing) return
-        if (window.confirm('Delete this transaction?')) {
+        if (skipConfirm || window.confirm('Delete this transaction?')) {
             dispatch({ type: 'delete', payload: editingId })
             if (onClose) onClose()
             else navigate('/transactions')
@@ -147,22 +147,28 @@ export default function AddTransaction({ onClose, editingId: propEditingId, defa
 
     return (
         <div className="max-w-md">
-            <h2 className="text-2xl font-semibold mb-4">{editing ? 'Edit Transaction' : 'Add Transaction'}</h2>
+            <h2 className="text-2xl font-semibold mb-4">{mode === 'delete' ? 'Delete Transaction' : (editing ? 'Edit Transaction' : 'Add Transaction')}</h2>
+            {mode === 'delete' && (
+                <div className="mb-4 p-3 rounded bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800">
+                    <div className="text-sm font-medium text-red-700">Delete transaction</div>
+                    <div className="text-sm muted">This will permanently remove the transaction. Fields are disabled. Click Delete to confirm.</div>
+                </div>
+            )}
             <form onSubmit={onSubmit} className="card-lg">
                 <label className="block mb-3">
                     <div className="text-sm muted">Description</div>
-                    <input value={description} onChange={e => setDescription(e.target.value)} className="mt-2 w-full border rounded-lg px-3 py-2" />
+                    <input value={description} onChange={e => setDescription(e.target.value)} className="mt-2 w-full border rounded-lg px-3 py-2" disabled={mode === 'delete'} />
                 </label>
 
                 <div className="grid grid-cols-2 gap-3 mb-3">
                     <label className="block">
                         <div className="text-sm muted">Amount</div>
-                        <input type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} className="mt-2 w-full border rounded-lg px-3 py-2" />
+                        <input type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} className="mt-2 w-full border rounded-lg px-3 py-2" disabled={mode === 'delete'} />
                     </label>
 
                     <label className="block">
                         <div className="text-sm muted">Type</div>
-                        <select value={type} onChange={e => setType(e.target.value)} className="mt-2 w-full border rounded-lg px-3 py-2">
+                        <select value={type} onChange={e => setType(e.target.value)} className="mt-2 w-full border rounded-lg px-3 py-2" disabled={mode === 'delete'}>
                             <option value="debit">Debit</option>
                             <option value="credit">Credit</option>
                         </select>
@@ -174,7 +180,7 @@ export default function AddTransaction({ onClose, editingId: propEditingId, defa
                         <div className="text-sm muted">Category</div>
                         <div className="mt-2">
                             {/* searchable picker using datalist for quicker selection */}
-                            <input list="categories-list" value={category} onChange={e => setCategory(e.target.value)} className="w-full border rounded-lg px-3 py-2" />
+                            <input list="categories-list" value={category} onChange={e => setCategory(e.target.value)} className="w-full border rounded-lg px-3 py-2" disabled={mode === 'delete'} />
                             <datalist id="categories-list">
                                 <option value="">Uncategorized</option>
                                 {Object.keys(state.categories || {}).map(n => (
@@ -188,7 +194,7 @@ export default function AddTransaction({ onClose, editingId: propEditingId, defa
                             )}
                             {category === '__new__' && (
                                 <div className="mt-3 grid grid-cols-1 gap-2">
-                                    <input placeholder="New category name" value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleConfirmNewCategory() }} className="w-full border rounded-lg px-3 py-2" />
+                                    <input placeholder="New category name" value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleConfirmNewCategory() }} className="w-full border rounded-lg px-3 py-2" disabled={mode === 'delete'} />
                                     <div className="text-xs muted">(Creates a main category. To create a subcategory, use Categories → Add subcategory)</div>
                                     <div className="flex gap-2">
                                         <button type="button" onClick={handleConfirmNewCategory} className="btn-primary">Add category</button>
@@ -204,14 +210,14 @@ export default function AddTransaction({ onClose, editingId: propEditingId, defa
 
                     <label>
                         <div className="text-sm muted">Date</div>
-                        <input type="date" value={date} onChange={e => setDate(e.target.value)} className="mt-2 w-full border rounded-lg px-3 py-2" />
+                        <input type="date" value={date} onChange={e => setDate(e.target.value)} className="mt-2 w-full border rounded-lg px-3 py-2" disabled={mode === 'delete'} />
                     </label>
                 </div>
 
                 <div className="mb-4">
                     <label>
                         <div className="text-sm muted">Account</div>
-                        <select value={account} onChange={e => setAccount(e.target.value)} className="mt-2 w-full border rounded-lg px-3 py-2">
+                        <select value={account} onChange={e => setAccount(e.target.value)} className="mt-2 w-full border rounded-lg px-3 py-2" disabled={mode === 'delete'}>
                             {(state.accounts ? Object.keys(state.accounts) : []).map(a => (
                                 <option key={a} value={a}>{a}</option>
                             ))}
@@ -224,16 +230,24 @@ export default function AddTransaction({ onClose, editingId: propEditingId, defa
 
                     {account === '__new__' && (
                         <div className="mt-3 grid grid-cols-2 gap-3">
-                            <input placeholder="Account name" value={newAccountName} onChange={e => setNewAccountName(e.target.value)} className="w-full border rounded-lg px-3 py-2" />
-                            <input placeholder="Starting balance" value={newAccountBalance} onChange={e => setNewAccountBalance(e.target.value)} className="w-full border rounded-lg px-3 py-2" />
+                            <input placeholder="Account name" value={newAccountName} onChange={e => setNewAccountName(e.target.value)} className="w-full border rounded-lg px-3 py-2" disabled={mode === 'delete'} />
+                            <input placeholder="Starting balance" value={newAccountBalance} onChange={e => setNewAccountBalance(e.target.value)} className="w-full border rounded-lg px-3 py-2" disabled={mode === 'delete'} />
                         </div>
                     )}
                 </div>
 
                 <div className="flex gap-3">
-                    <button type="submit" className="btn-primary">{editing ? 'Save' : 'Add'}</button>
-                    <button type="button" onClick={() => onClose ? onClose() : navigate(-1)} className="btn">Cancel</button>
-                    {editing && <button type="button" onClick={onDelete} className="ml-auto text-sm text-red-600 hover:underline">Delete</button>}
+                    {mode === 'delete' ? (
+                        <>
+                            <button type="button" onClick={onDelete} className="btn bg-red-600 text-white hover:bg-red-700">Delete</button>
+                            <button type="button" onClick={() => onClose ? onClose() : navigate(-1)} className="btn">Cancel</button>
+                        </>
+                    ) : (
+                        <>
+                            <button type="submit" className="btn-primary">{editing ? 'Save' : 'Add'}</button>
+                            <button type="button" onClick={() => onClose ? onClose() : navigate(-1)} className="btn">Cancel</button>
+                        </>
+                    )}
                 </div>
             </form>
         </div>

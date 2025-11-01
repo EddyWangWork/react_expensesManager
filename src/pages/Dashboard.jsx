@@ -172,6 +172,65 @@ export default function Dashboard() {
                 </div>
             </div>
 
+            {/* Global filters / toolbar moved here from Recent Transactions card */}
+            <div className="flex flex-wrap items-center gap-3 mt-4">
+                <div className="relative flex-none w-full sm:w-auto">
+                    <span className="absolute inset-y-0 left-2 flex items-center text-slate-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </span>
+                    <input aria-label="Search transactions" placeholder="Search description, category, account" value={query} onChange={e => setQuery(e.target.value)} className="border rounded pl-8 pr-8 py-1 w-full sm:w-56 md:w-72" />
+                    {query && (
+                        <button aria-label="Clear search" onClick={() => setQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    )}
+                </div>
+
+                <select aria-label="Filter by type" value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="border rounded px-2 py-1 text-sm flex-none">
+                    <option value="all">All</option>
+                    <option value="debit">Debit</option>
+                    <option value="credit">Credit</option>
+                </select>
+
+                {/* Year filter */}
+                <select aria-label="Filter by year" value={selectedYear} onChange={e => setSelectedYear(e.target.value)} className="border rounded px-2 py-1 text-sm">
+                    <option value="all">All years</option>
+                    {
+                        // derive years from transactions
+                        Array.from(new Set((state.transactions || []).map(t => {
+                            const d = new Date(t.date)
+                            return isNaN(d.getFullYear()) ? null : String(d.getFullYear())
+                        }).filter(Boolean))).sort((a, b) => Number(b) - Number(a)).map(y => (
+                            <option key={y} value={y}>{y}</option>
+                        ))
+                    }
+                </select>
+
+                {/* Month filter */}
+                <select aria-label="Filter by month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="border rounded px-2 py-1 text-sm">
+                    <option value="all">All months</option>
+                    {
+                        ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map((m, idx) => (
+                            <option key={m} value={String(idx)}>{m}</option>
+                        ))
+                    }
+                </select>
+
+                {/* Sorting */}
+                <select aria-label="Sort transactions" value={sortBy} onChange={e => setSortBy(e.target.value)} className="border rounded px-2 py-1 text-sm">
+                    <option value="date_desc">Date ↓</option>
+                    <option value="date_asc">Date ↑</option>
+                    <option value="amount_desc">Amount ↓</option>
+                    <option value="amount_asc">Amount ↑</option>
+                </select>
+
+                <button onClick={() => exportCSV(filteredTxs)} className="btn btn-ghost btn-sm" title="Export CSV">Export</button>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="card text-center">
                     <div className="text-sm muted">Total Credit</div>
@@ -194,63 +253,7 @@ export default function Dashboard() {
                 <div className="card-lg">
                     <div className="flex items-center justify-between mb-3">
                         <h3 className="text-lg font-medium">Recent Transactions</h3>
-                        <div className="flex flex-wrap items-center gap-3">
-                            <div className="relative flex-none w-full sm:w-auto">
-                                <span className="absolute inset-y-0 left-2 flex items-center text-slate-400">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1116.65 16.65z" />
-                                    </svg>
-                                </span>
-                                <input aria-label="Search transactions" placeholder="Search description, category, account" value={query} onChange={e => setQuery(e.target.value)} className="border rounded pl-8 pr-8 py-1 w-full sm:w-56 md:w-72" />
-                                {query && (
-                                    <button aria-label="Clear search" onClick={() => setQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700">
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                    </button>
-                                )}
-                            </div>
-
-                            <select aria-label="Filter by type" value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="border rounded px-2 py-1 text-sm flex-none">
-                                <option value="all">All</option>
-                                <option value="debit">Debit</option>
-                                <option value="credit">Credit</option>
-                            </select>
-
-                            {/* Year filter */}
-                            <select aria-label="Filter by year" value={selectedYear} onChange={e => setSelectedYear(e.target.value)} className="border rounded px-2 py-1 text-sm">
-                                <option value="all">All years</option>
-                                {
-                                    // derive years from transactions
-                                    Array.from(new Set((state.transactions || []).map(t => {
-                                        const d = new Date(t.date)
-                                        return isNaN(d.getFullYear()) ? null : String(d.getFullYear())
-                                    }).filter(Boolean))).sort((a, b) => Number(b) - Number(a)).map(y => (
-                                        <option key={y} value={y}>{y}</option>
-                                    ))
-                                }
-                            </select>
-
-                            {/* Month filter */}
-                            <select aria-label="Filter by month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="border rounded px-2 py-1 text-sm">
-                                <option value="all">All months</option>
-                                {
-                                    ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map((m, idx) => (
-                                        <option key={m} value={String(idx)}>{m}</option>
-                                    ))
-                                }
-                            </select>
-
-                            {/* Sorting */}
-                            <select aria-label="Sort transactions" value={sortBy} onChange={e => setSortBy(e.target.value)} className="border rounded px-2 py-1 text-sm">
-                                <option value="date_desc">Date ↓</option>
-                                <option value="date_asc">Date ↑</option>
-                                <option value="amount_desc">Amount ↓</option>
-                                <option value="amount_asc">Amount ↑</option>
-                            </select>
-
-                            <button onClick={() => exportCSV(filteredTxs)} className="btn btn-ghost btn-sm" title="Export CSV">Export</button>
-                        </div>
+                        {/* toolbar moved to top section */}
                     </div>
                     {/* compact header for larger screens */}
                     <div className="hidden md:flex items-center justify-between text-sm muted px-2 py-2 border-b">

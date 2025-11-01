@@ -41,12 +41,18 @@ export default function Categories() {
                     <div className="mt-3 border-t pt-3">
                         <div className="text-sm muted mb-2">Subcategories</div>
                         <div className="grid gap-2">
-                            {children.map(cn => (
-                                <div key={cn} className="flex items-center justify-between">
-                                    <div className="text-sm">{cn}</div>
-                                    <div className="text-sm font-medium">{(state.transactions || []).filter(t => (t.category || 'Uncategorized') === cn).length} tx</div>
-                                </div>
-                            ))}
+                            {children.map(cn => {
+                                const ccount = (state.transactions || []).filter(t => (t.category || 'Uncategorized') === cn).length
+                                return (
+                                    <div key={cn} className="flex items-center justify-between">
+                                        <div className="text-sm">{cn}</div>
+                                        <div className="flex items-center gap-2">
+                                            <div className="text-sm font-medium">{ccount} tx</div>
+                                            <button onClick={() => openCategoryModal(cn)} className="btn btn-ghost btn-sm">Manage</button>
+                                        </div>
+                                    </div>
+                                )
+                            })}
                         </div>
                     </div>
                 )}
@@ -57,7 +63,6 @@ export default function Categories() {
                 </div>
 
                 <div className="mt-4 flex items-center justify-between">
-                    <button onClick={() => openCategoryModal(name)} className="text-sm text-indigo-600 hover:underline">Edit</button>
                     <button onClick={() => openCategoryModal(name)} className="btn btn-ghost">Manage</button>
                 </div>
             </div>
@@ -102,7 +107,10 @@ export default function Categories() {
                                             return (
                                                 <div key={cn} className="flex items-center justify-between">
                                                     <div className="text-sm">{cn}</div>
-                                                    <div className={`text-sm font-medium ${ctotal < 0 ? 'text-red-600' : ''}`}>{ctxs.length} tx</div>
+                                                    <div className="flex items-center gap-2">
+                                                        <div className={`text-sm font-medium ${ctotal < 0 ? 'text-red-600' : ''}`}>{ctxs.length} tx</div>
+                                                        <button onClick={() => openCategoryModal(cn)} className="btn btn-ghost btn-sm">Manage</button>
+                                                    </div>
                                                 </div>
                                             )
                                         })}
@@ -117,7 +125,6 @@ export default function Categories() {
 
                             <div className="mt-4 flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                    <button onClick={() => openCategoryModal(name)} className="text-sm text-indigo-600 hover:underline">Edit</button>
                                     <button onClick={() => openCategoryModal(null, { parent: name })} className="btn btn-sm">+ Add subcategory</button>
                                 </div>
                                 <button onClick={() => openCategoryModal(name)} className="btn btn-ghost">Manage</button>

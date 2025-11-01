@@ -6,6 +6,7 @@ export function UIProvider({ children }) {
     const [modalOpen, setModalOpen] = useState(false)
     const [modalEditId, setModalEditId] = useState(null)
     const [modalDefaultAccount, setModalDefaultAccount] = useState(null)
+    const [modalAction, setModalAction] = useState(null)
     const [accountModalOpen, setAccountModalOpen] = useState(false)
     const [accountModalName, setAccountModalName] = useState(null)
     const [categoryModalOpen, setCategoryModalOpen] = useState(false)
@@ -18,6 +19,7 @@ export function UIProvider({ children }) {
     const openAddModal = useCallback((id = null, opts = {}) => {
         setModalEditId(id)
         setModalDefaultAccount(opts.defaultAccount || null)
+        setModalAction(opts.action || null)
         setModalOpen(true)
     }, [])
 
@@ -52,6 +54,7 @@ export function UIProvider({ children }) {
         setModalOpen(false)
         setModalEditId(null)
         setModalDefaultAccount(null)
+        setModalAction(null)
     }, [])
 
     const closeAccountModal = useCallback(() => {
@@ -66,7 +69,7 @@ export function UIProvider({ children }) {
     }, [])
 
     return (
-        <UIContext.Provider value={{ modalOpen, modalEditId, modalDefaultAccount, openAddModal, closeModal, accountModalOpen, accountModalName, openAccountModal, closeAccountModal, categoryModalOpen, categoryModalName, categoryModalParent, openCategoryModal, closeCategoryModal, notification, showNotification, hideNotification }}>
+        <UIContext.Provider value={{ modalOpen, modalEditId, modalDefaultAccount, modalAction, openAddModal, closeModal, accountModalOpen, accountModalName, openAccountModal, closeAccountModal, categoryModalOpen, categoryModalName, categoryModalParent, openCategoryModal, closeCategoryModal, notification, showNotification, hideNotification }}>
             {children}
         </UIContext.Provider>
     )

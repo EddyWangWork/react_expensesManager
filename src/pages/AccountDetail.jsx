@@ -56,6 +56,7 @@ export default function AccountDetail() {
                                     <th className="pb-2">Type</th>
                                     <th className="pb-2 text-right">Amount</th>
                                     <th className="pb-2 text-right">Acc Balance</th>
+                                    <th className="pb-2">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -73,7 +74,7 @@ export default function AccountDetail() {
                                     return (
                                         <React.Fragment key={dateKey}>
                                             <tr className="bg-slate-50 dark:bg-slate-800">
-                                                <td colSpan={4} className="py-2 text-sm font-medium">{formatted}</td>
+                                                <td colSpan={5} className="py-2 text-sm font-medium">{formatted}</td>
                                             </tr>
                                             {items.map(t => (
                                                 <tr key={t.id} className="border-t dark:border-slate-700 row-hover">
@@ -95,12 +96,18 @@ export default function AccountDetail() {
                                                         <span className={t.type === 'credit' ? 'text-emerald-600 dark:text-emerald-300 font-medium' : 'text-rose-600 dark:text-rose-300 font-medium'}>{(t.amount || 0).toFixed(2)}</span>
                                                     </td>
                                                     <td className="py-3 text-sm text-right align-middle">{(totals.runningBalances && totals.runningBalances[t.id] !== undefined) ? totals.runningBalances[t.id].toFixed(2) : '-'}</td>
+                                                    <td className="py-3 text-sm text-right align-middle">
+                                                        <div className="flex items-center justify-end gap-3">
+                                                            <button onClick={() => openAddModal(t.id)} className="text-sm text-indigo-600 hover:underline">Edit</button>
+                                                            <button onClick={() => openAddModal(t.id, { action: 'delete' })} className="text-sm text-red-600 hover:underline">Delete</button>
+                                                        </div>
+                                                    </td>
                                                 </tr>
                                             ))}
 
                                             {/* day subtotal row (credit / debit breakdown) */}
                                             <tr className="border-t bg-slate-100 dark:bg-slate-900/40">
-                                                <td colSpan={2} className="py-2 text-sm font-medium">Day totals</td>
+                                                <td colSpan={3} className="py-2 text-sm font-medium">Day totals</td>
                                                 <td className="py-2 text-sm text-right">
                                                     {(() => {
                                                         const credit = items.filter(it => it.type === 'credit').reduce((s, it) => s + Number(it.amount || 0), 0)

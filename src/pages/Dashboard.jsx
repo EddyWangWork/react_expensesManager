@@ -11,6 +11,8 @@ export default function Dashboard() {
     const [query, setQuery] = useState('')
     const [typeFilter, setTypeFilter] = useState('all')
     const [selectedYear, setSelectedYear] = useState('all')
+    const [startDate, setStartDate] = useState('')
+    const [endDate, setEndDate] = useState('')
     const [selectedMonth, setSelectedMonth] = useState('all')
     const [sortBy, setSortBy] = useState('date_desc')
     const [pageSize] = useState(8)
@@ -70,6 +72,64 @@ export default function Dashboard() {
         return { credit, debit, balance, totalsByCategory, totalsByAccount, monthlySummary }
     }
 
+    // formatter & presets for dashboard date controls (local yyyy-mm-dd)
+    const fmt = d => {
+        const yyyy = d.getFullYear()
+        const mm = String(d.getMonth() + 1).padStart(2, '0')
+        const dd = String(d.getDate()).padStart(2, '0')
+        return `${yyyy}-${mm}-${dd}`
+    }
+
+    const pretty = d => {
+        try { return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) }
+        catch (e) { return fmt(d) }
+    }
+
+    const computePresetRange = (preset) => {
+        if (!preset) return null
+        let base
+        try {
+            if (startDate) base = new Date(startDate)
+            else if (endDate) base = new Date(endDate)
+            else base = new Date()
+            if (isNaN(base.getTime())) base = new Date()
+        } catch (e) {
+            base = new Date()
+        }
+        const now = new Date()
+        const nowY = now.getFullYear()
+        const nowM = now.getMonth()
+        const y = base.getFullYear()
+        const m = base.getMonth()
+        let s, e
+        if (preset === 'this') {
+            s = new Date(nowY, nowM, 1)
+            e = new Date(nowY, nowM + 1, 0)
+        } else if (preset === 'prev') {
+            s = new Date(y, m - 1, 1)
+            e = new Date(y, m, 0)
+        } else if (preset === 'next') {
+            s = new Date(y, m + 1, 1)
+            e = new Date(y, m + 2, 0)
+        } else if (preset === 'clear') return null
+        return { s, e }
+    }
+
+    const applyPreset = (preset) => {
+        if (!preset) return
+        if (preset === 'clear') { setStartDate(''); setEndDate(''); return }
+        const r = computePresetRange(preset)
+        if (!r) return
+        setStartDate(fmt(r.s))
+        setEndDate(fmt(r.e))
+    }
+
+    const isPresetActive = (preset) => {
+        const r = computePresetRange(preset)
+        if (!r) return false
+        return startDate === fmt(r.s) && endDate === fmt(r.e)
+    }
+
     const sparkline = (values = []) => {
         const w = 140, h = 36, pad = 4
         if (!values || values.length === 0) return null
@@ -113,6 +173,17 @@ export default function Dashboard() {
         const res = all.filter(t => {
             // type filter
             if (typeFilter !== 'all' && t.type !== typeFilter) return false
+            // date filters
+            if (startDate) {
+                try {
+                    if (new Date(t.date) < new Date(startDate)) return false
+                } catch (e) { }
+            }
+            if (endDate) {
+                try {
+                    if (new Date(t.date) > new Date(endDate)) return false
+                } catch (e) { }
+            }
             // year/month filter
             if (selectedYear !== 'all' || selectedMonth !== 'all') {
                 const d = new Date(t.date)
@@ -134,7 +205,7 @@ export default function Dashboard() {
         })
 
         return res
-    }, [state.transactions, query, typeFilter, selectedYear, selectedMonth, sortBy])
+    }, [state.transactions, query, typeFilter, selectedYear, selectedMonth, sortBy, startDate, endDate])
 
     // derive visible (paginated) list from activeTxs
     const filteredTxs = useMemo(() => activeTxs.slice(0, 50), [activeTxs])
@@ -200,6 +271,38 @@ export default function Dashboard() {
                     <option value="transfer_in">Transfer In</option>
                     <option value="transfer_out">Transfer Out</option>
                 </select>
+
+                <div className="flex items-center gap-2">
+                    <input type="date" aria-label="from date" value={startDate} onChange={e => setStartDate(e.target.value)} className="border rounded px-2 py-1 text-sm" />
+                    <input type="date" aria-label="to date" value={endDate} onChange={e => setEndDate(e.target.value)} className="border rounded px-2 py-1 text-sm" />
+                </div>
+
+                <div className="inline-flex items-center gap-2">
+                    {(() => {
+                        const presets = ['this', 'prev', 'next']
+                        return presets.map(p => {
+                            const r = computePresetRange(p)
+                            const title = r ? `${pretty(r.s)} — ${pretty(r.e)}` : ''
+                            const active = isPresetActive(p)
+                            const label = p === 'this' ? 'This' : p === 'prev' ? 'Prev' : 'Next'
+                            return (
+                                <button
+                                    key={p}
+                                    type="button"
+                                    title={title}
+                                    aria-pressed={active}
+                                    aria-label={active ? `${label} preset active (${title})` : `Apply ${label} preset: ${title}`}
+                                    onClick={() => applyPreset(p)}
+                                    className={`border rounded px-2 py-1 text-sm hover:bg-slate-100 ${active ? 'bg-indigo-50 ring-1 ring-indigo-200' : ''}`}
+                                >
+                                    {label}
+                                </button>
+                            )
+                        })
+                    })()}
+
+                    <button type="button" onClick={() => applyPreset('clear')} className="border rounded px-2 py-1 text-sm text-red-600 hover:bg-red-50" title="Clear dates" aria-label="Clear date filters">Clear</button>
+                </div>
 
                 {/* Year filter */}
                 <select aria-label="Filter by year" value={selectedYear} onChange={e => setSelectedYear(e.target.value)} className="border rounded px-2 py-1 text-sm">

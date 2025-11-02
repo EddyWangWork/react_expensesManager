@@ -10,7 +10,17 @@ export default function Icon({ name, className = '', title }) {
         )
     }
 
-    // fallback: empty placeholder
+    if (name === 'search' || name === 'magnify') {
+        return (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" className={className} aria-hidden="true" focusable="false">
+                {title ? <title>{title}</title> : null}
+                <path strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" d="M8.5 14a5.5 5.5 0 100-11 5.5 5.5 0 000 11z" />
+                <path strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" d="M13.5 13.5L18 18" />
+            </svg>
+        )
+    }
+
+    // fallback: empty placeholder to avoid rendering nothing
     return (
         <svg className={className} aria-hidden="true" focusable="false" />
     )

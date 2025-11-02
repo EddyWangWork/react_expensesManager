@@ -5,6 +5,7 @@ import { useUI } from '../context/UIContext'
 
 const NavBar = () => {
     const [dark, setDark] = useState(false)
+    const [mobileOpen, setMobileOpen] = useState(false)
     const { user, logout, hasRole } = useAuth()
     const { showNotification, openConfirm } = useUI()
     const navigate = useNavigate()
@@ -47,50 +48,94 @@ const NavBar = () => {
     }
 
     return (
-        <header className="sticky top-0 z-20 backdrop-blur-sm bg-white/60 border-b dark:bg-slate-900/60">
-            <div className="max-w-7xl mx-auto px-6">
+        <header className="sticky top-0 z-30 backdrop-blur bg-white/60 dark:bg-slate-900/60 border-b">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-16">
+                    {/* left: brand */}
                     <div className="flex items-center gap-4">
-                        <div className="brand text-lg">ExpensesManager</div>
-                        <div className="hidden md:flex items-center gap-2 text-sm text-gray-500 dark:text-slate-400">
-                            <span className="pill">Personal</span>
-                        </div>
+                        <NavLink to="/" className="flex items-center gap-3">
+                            <div className="h-8 w-8 rounded-md bg-indigo-600 flex items-center justify-center text-white font-semibold">EM</div>
+                            <div className="hidden sm:block">
+                                <div className="text-lg font-semibold">ExpensesManager</div>
+                                <div className="text-xs text-slate-500 dark:text-slate-400">Personal</div>
+                            </div>
+                        </NavLink>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                        <nav className="flex items-center gap-3">
-                            <NavLink to="/" className={linkClass}>Dashboard</NavLink>
-                            {user ? (
-                                <>
-                                    <NavLink to="/transactions" className={linkClass}>Transactions</NavLink>
-                                    <NavLink to="/categories" className={linkClass}>Categories</NavLink>
-                                    <NavLink to="/accounts" className={linkClass}>Accounts</NavLink>
-                                    <NavLink to="/add" className={linkClass}>Add</NavLink>
-                                    <NavLink to="/about" className={linkClass}>About</NavLink>
-                                    {hasRole && hasRole('admin') && (
-                                        <NavLink to="/admin" className={linkClass}>Admin</NavLink>
-                                    )}
-                                </>
-                            ) : (
-                                <>
-                                    <NavLink to="/login" className={linkClass}>Login</NavLink>
-                                    <NavLink to="/register" className={linkClass}>Register</NavLink>
-                                </>
-                            )}
-                        </nav>
-
+                    {/* center / desktop nav */}
+                    <nav className="hidden md:flex items-center gap-2">
+                        <NavLink to="/" className={linkClass}>Dashboard</NavLink>
                         {user && (
+                            <>
+                                <NavLink to="/transactions" className={linkClass}>Transactions</NavLink>
+                                <NavLink to="/categories" className={linkClass}>Categories</NavLink>
+                                <NavLink to="/accounts" className={linkClass}>Accounts</NavLink>
+                                <NavLink to="/add" className={linkClass}>Add</NavLink>
+                                <NavLink to="/about" className={linkClass}>About</NavLink>
+                                {hasRole && hasRole('admin') && (
+                                    <NavLink to="/admin" className={linkClass}>Admin</NavLink>
+                                )}
+                            </>
+                        )}
+                    </nav>
+
+                    {/* right: actions */}
+                    <div className="flex items-center gap-3">
+                        {/* mobile menu button */}
+                        <button onClick={() => setMobileOpen(o => !o)} className="md:hidden p-2 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-slate-700 dark:text-slate-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                            </svg>
+                        </button>
+
+                        {/* auth actions */}
+                        {user ? (
                             <div className="flex items-center gap-3">
-                                <div className="text-sm muted">{user.username}</div>
-                                <button onClick={handleLogout} className="btn btn-ghost btn-sm">Logout</button>
+                                <div className="flex items-center gap-2">
+                                    <div className="h-8 w-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-medium">{(user.username || 'U').charAt(0).toUpperCase()}</div>
+                                    <div className="hidden sm:block text-sm">{user.username}</div>
+                                </div>
+                                <button onClick={handleLogout} className="px-3 py-1 rounded-md text-sm border hover:bg-gray-50 dark:hover:bg-slate-800">Logout</button>
+                            </div>
+                        ) : (
+                            <div className="hidden sm:flex items-center gap-2">
+                                <NavLink to="/login" className={linkClass}>Login</NavLink>
+                                <NavLink to="/register" className={linkClass}>Register</NavLink>
                             </div>
                         )}
 
-                        <button onClick={toggle} aria-label="Toggle theme" className="ml-3 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700">
+                        <button onClick={toggle} aria-label="Toggle theme" className="ml-1 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700">
                             {dark ? '🌙' : '☀️'}
                         </button>
                     </div>
                 </div>
+
+                {/* mobile menu panel */}
+                {mobileOpen && (
+                    <div className="md:hidden mt-2 pb-4">
+                        <nav className="flex flex-col gap-1">
+                            <NavLink to="/" onClick={() => setMobileOpen(false)} className={({ isActive }) => `${isActive ? 'bg-indigo-600 text-white' : 'text-slate-700 dark:text-slate-200'} block px-3 py-2 rounded-md`}>Dashboard</NavLink>
+                            {user ? (
+                                <>
+                                    <NavLink to="/transactions" onClick={() => setMobileOpen(false)} className={({ isActive }) => `${isActive ? 'bg-indigo-600 text-white' : 'text-slate-700 dark:text-slate-200'} block px-3 py-2 rounded-md`}>Transactions</NavLink>
+                                    <NavLink to="/categories" onClick={() => setMobileOpen(false)} className={({ isActive }) => `${isActive ? 'bg-indigo-600 text-white' : 'text-slate-700 dark:text-slate-200'} block px-3 py-2 rounded-md`}>Categories</NavLink>
+                                    <NavLink to="/accounts" onClick={() => setMobileOpen(false)} className={({ isActive }) => `${isActive ? 'bg-indigo-600 text-white' : 'text-slate-700 dark:text-slate-200'} block px-3 py-2 rounded-md`}>Accounts</NavLink>
+                                    <NavLink to="/add" onClick={() => setMobileOpen(false)} className={({ isActive }) => `${isActive ? 'bg-indigo-600 text-white' : 'text-slate-700 dark:text-slate-200'} block px-3 py-2 rounded-md`}>Add</NavLink>
+                                    <NavLink to="/about" onClick={() => setMobileOpen(false)} className={({ isActive }) => `${isActive ? 'bg-indigo-600 text-white' : 'text-slate-700 dark:text-slate-200'} block px-3 py-2 rounded-md`}>About</NavLink>
+                                    {hasRole && hasRole('admin') && (
+                                        <NavLink to="/admin" onClick={() => setMobileOpen(false)} className={({ isActive }) => `${isActive ? 'bg-indigo-600 text-white' : 'text-slate-700 dark:text-slate-200'} block px-3 py-2 rounded-md`}>Admin</NavLink>
+                                    )}
+                                    <button onClick={() => { setMobileOpen(false); handleLogout() }} className="text-left px-3 py-2 rounded-md text-slate-700 dark:text-slate-200">Logout</button>
+                                </>
+                            ) : (
+                                <>
+                                    <NavLink to="/login" onClick={() => setMobileOpen(false)} className={({ isActive }) => `${isActive ? 'bg-indigo-600 text-white' : 'text-slate-700 dark:text-slate-200'} block px-3 py-2 rounded-md`}>Login</NavLink>
+                                    <NavLink to="/register" onClick={() => setMobileOpen(false)} className={({ isActive }) => `${isActive ? 'bg-indigo-600 text-white' : 'text-slate-700 dark:text-slate-200'} block px-3 py-2 rounded-md`}>Register</NavLink>
+                                </>
+                            )}
+                        </nav>
+                    </div>
+                )}
             </div>
         </header>
     )

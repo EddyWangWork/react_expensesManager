@@ -1,4 +1,7 @@
 import React, { useEffect, useRef } from 'react'
+import { useAuth } from './context/AuthContext'
+import Spinner from './components/Spinner'
+import DebugPanel from './components/DebugPanel'
 import { Routes, Route, useLocation, useNavigate } from 'react-router-dom'
 import NavBar from './components/NavBar'
 // Ensure we import the existing dashboard page. Some edits introduced a stale import
@@ -28,6 +31,7 @@ import { AuthProvider } from './context/AuthContext'
 
 function AppInner() {
     const { modalOpen, modalEditId, modalDefaultAccount, modalAction, closeModal } = useUI()
+    const { isReady } = useAuth()
     const loc = useLocation()
     const navigate = useNavigate()
     const { openAddModal } = useUI()
@@ -86,6 +90,16 @@ function AppInner() {
         <TransactionsProvider>
             <div className="app-shell">
                 <NavBar />
+                {/* top-bar loader to preserve layout while auth initializes */}
+                {!isReady && (
+                    <div className="w-full bg-slate-50 dark:bg-slate-900 border-b">
+                        <div className="max-w-7xl mx-auto px-6 py-2 flex items-center gap-3 text-sm text-slate-700 dark:text-slate-300">
+                            <Spinner size={18} speed={500} />
+                            <div>Initializing app...</div>
+                        </div>
+                    </div>
+                )}
+
                 <main className="max-w-7xl mx-auto px-6 py-10">
                     <Routes>
                         <Route path="/login" element={<Login />} />
@@ -118,6 +132,7 @@ function AppInner() {
                 <CategoryEditorWrapper />
                 <SnackbarWrapper />
                 <ConfirmWrapper />
+                <DebugPanel />
             </div>
         </TransactionsProvider>
     )

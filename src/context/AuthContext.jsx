@@ -62,6 +62,7 @@ export function AuthProvider({ children }) {
         users.push(newUser)
         localStorage.setItem('auth_users', JSON.stringify(users))
         setUser({ id: newUser.id, username: newUser.username, roles: newUser.roles })
+        try { console.info('Auth: registered', newUser.username) } catch (e) { }
         return newUser
     }
 
@@ -72,11 +73,13 @@ export function AuthProvider({ children }) {
         const found = users.find(u => u.username === username && u.passHash === passHash)
         if (!found) throw new Error('Invalid username or password')
         setUser({ id: found.id, username: found.username, roles: found.roles || ['user'] })
+        try { console.info('Auth: login', found.username) } catch (e) { }
         return found
     }
 
     const logout = () => {
         setUser(null)
+        try { console.info('Auth: logout') } catch (e) { }
     }
 
     // admin helpers: list/update/delete users (client-only localStorage operations)

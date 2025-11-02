@@ -18,6 +18,20 @@ export function UIProvider({ children }) {
     const [confirmTitle, setConfirmTitle] = useState(null)
     const [confirmMessage, setConfirmMessage] = useState(null)
     const confirmCallback = React.useRef(null)
+    // app-wide progress state (0-100). null means inactive.
+    const [progress, setProgress] = useState(null)
+
+    const startProgress = useCallback((initial = 0) => {
+        setProgress(initial)
+    }, [])
+
+    const updateProgress = useCallback((v) => {
+        setProgress(v)
+    }, [])
+
+    const stopProgress = useCallback(() => {
+        setProgress(null)
+    }, [])
 
     // openAddModal can accept an id (for editing) and an options object { defaultAccount }
     const openAddModal = useCallback((id = null, opts = {}) => {
@@ -89,7 +103,7 @@ export function UIProvider({ children }) {
     }, [])
 
     return (
-        <UIContext.Provider value={{ modalOpen, modalEditId, modalDefaultAccount, modalAction, openAddModal, closeModal, accountModalOpen, accountModalName, openAccountModal, closeAccountModal, categoryModalOpen, categoryModalName, categoryModalParent, openCategoryModal, closeCategoryModal, notification, showNotification, hideNotification, confirmOpen, confirmTitle, confirmMessage, openConfirm, closeConfirm, confirmCallback }}>
+        <UIContext.Provider value={{ modalOpen, modalEditId, modalDefaultAccount, modalAction, openAddModal, closeModal, accountModalOpen, accountModalName, openAccountModal, closeAccountModal, categoryModalOpen, categoryModalName, categoryModalParent, openCategoryModal, closeCategoryModal, notification, showNotification, hideNotification, confirmOpen, confirmTitle, confirmMessage, openConfirm, closeConfirm, confirmCallback, progress, startProgress, updateProgress, stopProgress }}>
             {children}
         </UIContext.Provider>
     )

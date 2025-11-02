@@ -5,11 +5,18 @@ import NavBar from './components/NavBar'
 // pointing at `./pages/DashboardNew` which doesn't exist in the repo. Use the
 // canonical `./pages/Dashboard` component.
 import Dashboard from './pages/Dashboard'
+import Login from './pages/Login'
+import Register from './pages/Register'
+import PrivateRoute from './components/PrivateRoute'
 import Transactions from './pages/Transactions'
 import AddTransaction from './pages/AddTransaction'
 import About from './pages/About'
 import Accounts from './pages/Accounts'
 import AccountDetail from './pages/AccountDetail'
+import Admin from './pages/Admin'
+import AdminUsers from './pages/AdminUsers'
+import AdminUserEditPage from './pages/AdminUserEditPage'
+import AccessDenied from './pages/AccessDenied'
 import { TransactionsProvider } from './context/TransactionsContext'
 import { UIProvider, useUI } from './context/UIContext'
 import Modal from './components/Modal'
@@ -17,6 +24,7 @@ import AccountEditor from './pages/AccountEditor'
 import Snackbar from './components/Snackbar'
 import Categories from './pages/Categories'
 import CategoryEditor from './pages/CategoryEditor'
+import { AuthProvider } from './context/AuthContext'
 
 function AppInner() {
     const { modalOpen, modalEditId, modalDefaultAccount, modalAction, closeModal } = useUI()
@@ -80,15 +88,21 @@ function AppInner() {
                 <NavBar />
                 <main className="max-w-7xl mx-auto px-6 py-10">
                     <Routes>
-                        <Route path="/" element={<Dashboard />} />
+                        <Route path="/login" element={<Login />} />
+                        <Route path="/register" element={<Register />} />
+                        <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
                         <Route path="/transactions" element={<Transactions />} />
                         <Route path="/categories" element={<Categories />} />
                         <Route path="/categories/:name" element={<CategoryEditor />} />
                         <Route path="/accounts" element={<Accounts />} />
-                        <Route path="/accounts/:name" element={<AccountDetail />} />
-                        <Route path="/add" element={<AddTransaction />} />
-                        <Route path="/edit/:id" element={<AddTransaction />} />
+                        <Route path="/accounts/:name" element={<PrivateRoute><AccountDetail /></PrivateRoute>} />
+                        <Route path="/add" element={<PrivateRoute><AddTransaction /></PrivateRoute>} />
+                        <Route path="/edit/:id" element={<PrivateRoute><AddTransaction /></PrivateRoute>} />
                         <Route path="/about" element={<About />} />
+                        <Route path="/admin" element={<PrivateRoute role="admin"><Admin /></PrivateRoute>} />
+                        <Route path="/admin/users" element={<PrivateRoute role="admin"><AdminUsers /></PrivateRoute>} />
+                        <Route path="/admin/users/:id" element={<PrivateRoute role="admin"><AdminUserEditPage /></PrivateRoute>} />
+                        <Route path="/denied" element={<AccessDenied />} />
                     </Routes>
                 </main>
 
@@ -103,6 +117,7 @@ function AppInner() {
                 <AccountEditorWrapper />
                 <CategoryEditorWrapper />
                 <SnackbarWrapper />
+                <ConfirmWrapper />
             </div>
         </TransactionsProvider>
     )
@@ -133,10 +148,31 @@ function SnackbarWrapper() {
     return <Snackbar notification={notification} onHide={hideNotification} />
 }
 
+function ConfirmWrapper() {
+    const { confirmOpen, confirmTitle, confirmMessage, closeConfirm, confirmCallback } = useUI()
+    if (!confirmOpen) return null
+    return (
+        <Modal
+            onClose={closeConfirm}
+            title={confirmTitle || 'Confirm'}
+            footer={(
+                <>
+                    <button className="btn btn-ghost" onClick={closeConfirm}>Cancel</button>
+                    <button className="btn btn-primary" onClick={() => { try { if (confirmCallback && confirmCallback.current) confirmCallback.current() } catch (e) { } closeConfirm() }}>Confirm</button>
+                </>
+            )}
+        >
+            <div className="py-2 text-sm text-slate-700 dark:text-slate-300">{confirmMessage}</div>
+        </Modal>
+    )
+}
+
 export default function App() {
     return (
-        <UIProvider>
-            <AppInner />
-        </UIProvider>
+        <AuthProvider>
+            <UIProvider>
+                <AppInner />
+            </UIProvider>
+        </AuthProvider>
     )
 }

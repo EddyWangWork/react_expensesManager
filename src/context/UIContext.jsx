@@ -14,6 +14,10 @@ export function UIProvider({ children }) {
     const [categoryModalParent, setCategoryModalParent] = useState(null)
     const [notification, setNotification] = useState(null)
     const notificationTimer = React.useRef(null)
+    const [confirmOpen, setConfirmOpen] = useState(false)
+    const [confirmTitle, setConfirmTitle] = useState(null)
+    const [confirmMessage, setConfirmMessage] = useState(null)
+    const confirmCallback = React.useRef(null)
 
     // openAddModal can accept an id (for editing) and an options object { defaultAccount }
     const openAddModal = useCallback((id = null, opts = {}) => {
@@ -68,8 +72,24 @@ export function UIProvider({ children }) {
         setCategoryModalParent(null)
     }, [])
 
+    // confirmation modal helpers
+    const openConfirm = useCallback((opts) => {
+        // opts: { title, message, onConfirm }
+        setConfirmTitle(opts && opts.title ? opts.title : null)
+        setConfirmMessage(opts && opts.message ? opts.message : null)
+        confirmCallback.current = opts && typeof opts.onConfirm === 'function' ? opts.onConfirm : null
+        setConfirmOpen(true)
+    }, [])
+
+    const closeConfirm = useCallback(() => {
+        setConfirmOpen(false)
+        setConfirmTitle(null)
+        setConfirmMessage(null)
+        confirmCallback.current = null
+    }, [])
+
     return (
-        <UIContext.Provider value={{ modalOpen, modalEditId, modalDefaultAccount, modalAction, openAddModal, closeModal, accountModalOpen, accountModalName, openAccountModal, closeAccountModal, categoryModalOpen, categoryModalName, categoryModalParent, openCategoryModal, closeCategoryModal, notification, showNotification, hideNotification }}>
+        <UIContext.Provider value={{ modalOpen, modalEditId, modalDefaultAccount, modalAction, openAddModal, closeModal, accountModalOpen, accountModalName, openAccountModal, closeAccountModal, categoryModalOpen, categoryModalName, categoryModalParent, openCategoryModal, closeCategoryModal, notification, showNotification, hideNotification, confirmOpen, confirmTitle, confirmMessage, openConfirm, closeConfirm, confirmCallback }}>
             {children}
         </UIContext.Provider>
     )

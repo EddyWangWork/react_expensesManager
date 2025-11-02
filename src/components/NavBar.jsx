@@ -7,7 +7,7 @@ const NavBar = () => {
     const [dark, setDark] = useState(false)
     const [mobileOpen, setMobileOpen] = useState(false)
     const { user, logout, hasRole } = useAuth()
-    const { showNotification, openConfirm } = useUI()
+    const { showNotification, openConfirm, openAddModal } = useUI()
     const navigate = useNavigate()
 
     useEffect(() => {
@@ -70,7 +70,7 @@ const NavBar = () => {
                                 <NavLink to="/transactions" className={linkClass}>Transactions</NavLink>
                                 <NavLink to="/categories" className={linkClass}>Categories</NavLink>
                                 <NavLink to="/accounts" className={linkClass}>Accounts</NavLink>
-                                <NavLink to="/add" className={linkClass}>Add</NavLink>
+                                <button onClick={() => openAddModal && openAddModal(null)} className={linkClass({ isActive: false })}>Add</button>
                                 <NavLink to="/about" className={linkClass}>About</NavLink>
                                 {hasRole && hasRole('admin') && (
                                     <NavLink to="/admin" className={linkClass}>Admin</NavLink>
@@ -120,7 +120,7 @@ const NavBar = () => {
                                     <NavLink to="/transactions" onClick={() => setMobileOpen(false)} className={({ isActive }) => `${isActive ? 'bg-indigo-600 text-white' : 'text-slate-700 dark:text-slate-200'} block px-3 py-2 rounded-md`}>Transactions</NavLink>
                                     <NavLink to="/categories" onClick={() => setMobileOpen(false)} className={({ isActive }) => `${isActive ? 'bg-indigo-600 text-white' : 'text-slate-700 dark:text-slate-200'} block px-3 py-2 rounded-md`}>Categories</NavLink>
                                     <NavLink to="/accounts" onClick={() => setMobileOpen(false)} className={({ isActive }) => `${isActive ? 'bg-indigo-600 text-white' : 'text-slate-700 dark:text-slate-200'} block px-3 py-2 rounded-md`}>Accounts</NavLink>
-                                    <NavLink to="/add" onClick={() => setMobileOpen(false)} className={({ isActive }) => `${isActive ? 'bg-indigo-600 text-white' : 'text-slate-700 dark:text-slate-200'} block px-3 py-2 rounded-md`}>Add</NavLink>
+                                    <button onClick={() => { setMobileOpen(false); openAddModal && openAddModal(null) }} className={({ isActive }) => `${isActive ? 'bg-indigo-600 text-white' : 'text-slate-700 dark:text-slate-200'} block px-3 py-2 rounded-md`}>Add</button>
                                     <NavLink to="/about" onClick={() => setMobileOpen(false)} className={({ isActive }) => `${isActive ? 'bg-indigo-600 text-white' : 'text-slate-700 dark:text-slate-200'} block px-3 py-2 rounded-md`}>About</NavLink>
                                     {hasRole && hasRole('admin') && (
                                         <NavLink to="/admin" onClick={() => setMobileOpen(false)} className={({ isActive }) => `${isActive ? 'bg-indigo-600 text-white' : 'text-slate-700 dark:text-slate-200'} block px-3 py-2 rounded-md`}>Admin</NavLink>

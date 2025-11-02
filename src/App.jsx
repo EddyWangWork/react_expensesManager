@@ -41,42 +41,18 @@ function AppInner() {
     const prevPathRef = useRef(null)
 
     // update lastNonModalPath when the user navigates to a non-modal route
+    // we no longer treat '/add' or '/edit/:id' as navigable pages — modals are UI-only
     useEffect(() => {
-        if (!loc.pathname.startsWith('/add') && !loc.pathname.startsWith('/edit/')) {
-            lastNonModalPath.current = loc.pathname
-        }
+        lastNonModalPath.current = loc.pathname
     }, [loc.pathname])
 
-    // when route is /add or /edit/:id (direct navigation), open the modal and remember previous path
-    useEffect(() => {
-        if (loc.pathname === '/add') {
-            if (!modalOpen) {
-                prevPathRef.current = lastNonModalPath.current || '/'
-                openAddModal(null)
-            }
-            return
-        }
-        if (loc.pathname.startsWith('/edit/')) {
-            if (!modalOpen) {
-                const parts = loc.pathname.split('/')
-                const id = parts[2]
-                prevPathRef.current = lastNonModalPath.current || '/'
-                openAddModal(Number(id))
-            }
-            return
-        }
-    }, [loc.pathname])
+    // We no longer open modals based on URL. Add/edit operations are modal-only and
+    // should be triggered by UI actions (openAddModal). This avoids relying on
+    // direct navigation to '/edit/:id' to open the modal.
 
     // when modal opens/closes from UI actions, push/restore URL accordingly
     useEffect(() => {
-        if (modalOpen) {
-            // if current path is not the modal path, navigate to modal path and remember previous
-            if (!loc.pathname.startsWith('/add') && !loc.pathname.startsWith('/edit/')) {
-                prevPathRef.current = lastNonModalPath.current || '/'
-                const target = modalEditId ? `/edit/${modalEditId}` : '/add'
-                navigate(target)
-            }
-        } else {
+        if (!modalOpen) {
             // modal closed: if we stored a previous path, restore it
             if (prevPathRef.current) {
                 const to = prevPathRef.current
@@ -84,6 +60,7 @@ function AppInner() {
                 navigate(to)
             }
         }
+        // Note: we intentionally do NOT push any '/edit/:id' URL when opening the modal.
     }, [modalOpen, modalEditId])
 
     return (
@@ -110,8 +87,7 @@ function AppInner() {
                         <Route path="/categories/:name" element={<CategoryEditor />} />
                         <Route path="/accounts" element={<Accounts />} />
                         <Route path="/accounts/:name" element={<PrivateRoute><AccountDetail /></PrivateRoute>} />
-                        <Route path="/add" element={<PrivateRoute><AddTransaction /></PrivateRoute>} />
-                        <Route path="/edit/:id" element={<PrivateRoute><AddTransaction /></PrivateRoute>} />
+                        {/* Edit is modal-only now; do not expose /edit/:id as a top-level page */}
                         <Route path="/about" element={<About />} />
                         <Route path="/admin" element={<PrivateRoute role="admin"><Admin /></PrivateRoute>} />
                         <Route path="/admin/users" element={<PrivateRoute role="admin"><AdminUsers /></PrivateRoute>} />

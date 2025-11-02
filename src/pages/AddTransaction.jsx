@@ -1,12 +1,23 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTransactions } from '../context/TransactionsContext'
+import Icon from '../components/Icon'
 
 export default function AddTransaction({ onClose, editingId: propEditingId, defaultAccount, mode }) {
     const [description, setDescription] = useState('')
     const [amount, setAmount] = useState('')
     const [type, setType] = useState('debit')
-    const [category, setCategory] = useState('General')
+    // const [category, setCategory] = useState('General')
+    const [mainCategory, setMainCategory] = useState('')
+    const [subCategory, setSubCategory] = useState('')
+    const [newCategoryParent, setNewCategoryParent] = useState(null)
+    // typeahead/query states
+    const [mainQuery, setMainQuery] = useState('')
+    const [subQuery, setSubQuery] = useState('')
+    const [showMainList, setShowMainList] = useState(false)
+    const [showSubList, setShowSubList] = useState(false)
+    const mainRef = useRef(null)
+    const subRef = useRef(null)
     const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
     const [account, setAccount] = useState(defaultAccount || 'ABCBank')
     const [otherAccount, setOtherAccount] = useState('')
@@ -31,7 +42,28 @@ export default function AddTransaction({ onClose, editingId: propEditingId, defa
                 setDescription(tx.description || '')
                 setAmount(String(tx.amount || ''))
                 setType(tx.type || 'debit')
-                setCategory(tx.category || 'General')
+                // split stored category into main/sub if it has a parent
+                const storedCat = tx.category || ''
+                const cats = state.categories || {}
+                if (storedCat) {
+                    const entry = cats[storedCat]
+                    if (entry && entry.parent) {
+                        setMainCategory(entry.parent)
+                        setSubCategory(storedCat)
+                        setMainQuery(entry.parent)
+                        setSubQuery(storedCat)
+                    } else {
+                        setMainCategory(storedCat)
+                        setSubCategory('')
+                        setMainQuery(storedCat)
+                        setSubQuery('')
+                    }
+                } else {
+                    setMainCategory('')
+                    setSubCategory('')
+                    setMainQuery('')
+                    setSubQuery('')
+                }
                 setDate(tx.date || new Date().toISOString().slice(0, 10))
                 setAccount(tx.account || 'ABCBank')
                 // if this transaction is part of a paired transfer, populate otherAccount
@@ -53,6 +85,42 @@ export default function AddTransaction({ onClose, editingId: propEditingId, defa
         }
     }, [account])
 
+    // hide suggestion lists when clicking outside
+    useEffect(() => {
+        const onDocClick = (e) => {
+            if (mainRef.current && !mainRef.current.contains(e.target)) setShowMainList(false)
+            if (subRef.current && !subRef.current.contains(e.target)) setShowSubList(false)
+        }
+        document.addEventListener('click', onDocClick)
+        return () => document.removeEventListener('click', onDocClick)
+    }, [])
+
+    const allCategoryNames = useMemo(() => {
+        const map = state.categories || {}
+        const fromTx = new Set((state.transactions || []).map(t => t.category).filter(Boolean))
+        return Array.from(new Set([...Object.keys(map), ...Array.from(fromTx)]))
+    }, [state.categories, state.transactions])
+
+    // visible suggestion lists (main and sub) used for keyboard navigation
+    const mainVisible = useMemo(() => {
+        return allCategoryNames
+            .filter(n => { const e = (state.categories || {})[n]; return !(e && e.parent) })
+            .filter(n => n.toLowerCase().includes(mainQuery.toLowerCase()))
+    }, [allCategoryNames, mainQuery, state.categories])
+
+    const subVisible = useMemo(() => {
+        return allCategoryNames
+            .filter(n => { const e = (state.categories || {})[n]; return e && e.parent === mainCategory })
+            .filter(n => n.toLowerCase().includes(subQuery.toLowerCase()))
+    }, [allCategoryNames, subQuery, state.categories, mainCategory])
+
+    const [mainFocus, setMainFocus] = useState(-1)
+    const [subFocus, setSubFocus] = useState(-1)
+
+    // reset focus when query or visibility changes
+    useEffect(() => { setMainFocus(-1) }, [mainQuery, showMainList])
+    useEffect(() => { setSubFocus(-1) }, [subQuery, showSubList, mainCategory])
+
     const onSubmit = (e) => {
         e.preventDefault()
         const baseId = Date.now()
@@ -63,7 +131,8 @@ export default function AddTransaction({ onClose, editingId: propEditingId, defa
             description: description || 'Untitled',
             amount: parseFloat(amount) || 0,
             type,
-            category: category || '',
+            // category will be determined from main/sub selection below
+            category: '',
             // normalize date to YYYY-MM-DD
             date: normalizedDate,
             account: account || 'Unassigned'
@@ -107,18 +176,35 @@ export default function AddTransaction({ onClose, editingId: propEditingId, defa
         if (editing) {
             // preserve id when updating
             payload.id = editingId
-            // handle inline new category if present
-            if (payload.category === '__new__') {
+            // determine selected category from main/sub
+            let selectedCat = ''
+            if (subCategory === '__new__') {
+                // creating a new subcategory under the chosen main
                 const name = (newCategoryName || '').trim()
                 if (!name) {
                     alert('Please provide a name for the new category')
                     return
                 }
-                if (!((state.categories || {})[name])) dispatch({ type: 'addCategory', payload: { name } })
-                payload.category = name
-            } else if (!payload.category) {
-                payload.category = 'Uncategorized'
+                const parent = mainCategory || null
+                if (!((state.categories || {})[name])) dispatch({ type: 'addCategory', payload: { name, parent } })
+                selectedCat = name
+            } else if (mainCategory === '__new__') {
+                // creating a new main category
+                const name = (newCategoryName || '').trim()
+                if (!name) {
+                    alert('Please provide a name for the new category')
+                    return
+                }
+                if (!((state.categories || {})[name])) dispatch({ type: 'addCategory', payload: { name, parent: null } })
+                selectedCat = name
+            } else if (subCategory) {
+                selectedCat = subCategory
+            } else if (mainCategory) {
+                selectedCat = mainCategory
+            } else {
+                selectedCat = 'Uncategorized'
             }
+            payload.category = selectedCat
             // if editing a transfer (has transferId), update both sides
             const existing = state.transactions.find(t => t.id === editingId)
             if (existing && existing.transferId) {
@@ -170,17 +256,33 @@ export default function AddTransaction({ onClose, editingId: propEditingId, defa
             }
         } else {
             // handle inline new category if present
-            if (payload.category === '__new__') {
+            // determine selected category for non-edit create flow
+            let selectedCat = ''
+            if (subCategory === '__new__') {
                 const name = (newCategoryName || '').trim()
                 if (!name) {
                     alert('Please provide a name for the new category')
                     return
                 }
-                if (!((state.categories || {})[name])) dispatch({ type: 'addCategory', payload: { name } })
-                payload.category = name
-            } else if (!payload.category) {
-                payload.category = 'Uncategorized'
+                const parent = mainCategory || null
+                if (!((state.categories || {})[name])) dispatch({ type: 'addCategory', payload: { name, parent } })
+                selectedCat = name
+            } else if (mainCategory === '__new__') {
+                const name = (newCategoryName || '').trim()
+                if (!name) {
+                    alert('Please provide a name for the new category')
+                    return
+                }
+                if (!((state.categories || {})[name])) dispatch({ type: 'addCategory', payload: { name, parent: null } })
+                selectedCat = name
+            } else if (subCategory) {
+                selectedCat = subCategory
+            } else if (mainCategory) {
+                selectedCat = mainCategory
+            } else {
+                selectedCat = 'Uncategorized'
             }
+            payload.category = selectedCat
             if (type === 'transfer_in' || type === 'transfer_out') {
                 // create paired transactions: one transfer_out and one transfer_in
                 const transferId = `tr_${baseId}`
@@ -226,7 +328,7 @@ export default function AddTransaction({ onClose, editingId: propEditingId, defa
         }
     }
 
-    const handleConfirmNewCategory = () => {
+    const handleConfirmNewCategory = (parent = null) => {
         const name = (newCategoryName || '').trim()
         if (!name) {
             setCategoryMsg('Please enter a category name')
@@ -237,18 +339,34 @@ export default function AddTransaction({ onClose, editingId: propEditingId, defa
         if ((state.categories || {})[name]) {
             setCategoryMsg('Category already exists')
             setCategoryMsgType('error')
-            setCategory(name)
+            // select the existing category
+            if (parent) {
+                setMainCategory(parent)
+                setSubCategory(name)
+            } else {
+                setMainCategory(name)
+                setSubCategory('')
+            }
             setNewCategoryName('')
             setTimeout(() => setCategoryMsg(''), 2000)
             return
         }
-        // inline add only creates main categories (parent = null)
-        dispatch({ type: 'addCategory', payload: { name, parent: null } })
+        dispatch({ type: 'addCategory', payload: { name, parent } })
         setCategoryMsg('Category added')
         setCategoryMsgType('success')
-        setCategory(name)
+        if (parent) {
+            setMainCategory(parent)
+            setSubCategory(name)
+            setMainQuery(parent)
+            setSubQuery(name)
+        } else {
+            setMainCategory(name)
+            setSubCategory('')
+            setMainQuery(name)
+            setSubQuery('')
+        }
         setNewCategoryName('')
-        setNewCategoryParent('')
+        setNewCategoryParent(null)
         setTimeout(() => setCategoryMsg(''), 2000)
     }
 
@@ -298,36 +416,152 @@ export default function AddTransaction({ onClose, editingId: propEditingId, defa
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 mb-4">
-                    <label>
-                        <div className="text-sm muted">Category</div>
-                        <div className="mt-2">
-                            {/* searchable picker using datalist for quicker selection */}
-                            <input list="categories-list" value={category} onChange={e => setCategory(e.target.value)} className="w-full border rounded-lg px-3 py-2" disabled={mode === 'delete'} />
-                            <datalist id="categories-list">
-                                <option value="">Uncategorized</option>
-                                {Object.keys(state.categories || {}).map(n => (
-                                    <option key={n} value={n}>{state.categories[n] && state.categories[n].parent ? `${state.categories[n].parent} › ${n}` : n}</option>
-                                ))}
-                                <option value="__new__">+ Add new category...</option>
-                            </datalist>
-                            {/* breadcrumb for selected category */}
-                            {category && category !== '__new__' && category !== '' && (
-                                <div className="text-xs muted mt-1">{getCategoryPath(category).join(' › ')}</div>
+                    <label ref={mainRef}>
+                        <div className="text-sm muted">Main category</div>
+                        <div className="mt-2 relative">
+                            <input
+                                value={mainQuery}
+                                onChange={e => { setMainQuery(e.target.value); setMainCategory(''); setSubCategory(''); setShowMainList(true) }}
+                                onFocus={() => setShowMainList(true)}
+                                onKeyDown={e => {
+                                    if (e.key === 'Escape') { setMainCategory(''); setMainQuery(''); setShowMainList(false); setMainFocus(-1); e.stopPropagation(); }
+                                    else if (e.key === 'ArrowDown') {
+                                        e.preventDefault()
+                                        // allow focus to go to add-new (index = mainVisible.length)
+                                        setMainFocus(f => Math.min(f + 1, mainVisible.length))
+                                        setShowMainList(true)
+                                    } else if (e.key === 'ArrowUp') {
+                                        e.preventDefault()
+                                        setMainFocus(f => Math.max(f - 1, 0))
+                                    } else if (e.key === 'Enter') {
+                                        e.preventDefault()
+                                        if (mainFocus >= 0) {
+                                            if (mainFocus < mainVisible.length) {
+                                                const sel = mainVisible[mainFocus]
+                                                setMainCategory(sel); setMainQuery(sel); setShowMainList(false); setSubCategory(''); setMainFocus(-1)
+                                            } else {
+                                                // add new
+                                                setNewCategoryName(mainQuery)
+                                                handleConfirmNewCategory(null)
+                                                setShowMainList(false)
+                                                setMainFocus(-1)
+                                            }
+                                        } else if (mainVisible.length === 1) {
+                                            const sel = mainVisible[0]
+                                            setMainCategory(sel); setMainQuery(sel); setShowMainList(false); setSubCategory(''); setMainFocus(-1)
+                                        }
+                                    }
+                                }}
+                                placeholder="Type to search or create"
+                                className="w-full border rounded-lg px-3 py-2 pr-8"
+                                disabled={mode === 'delete'}
+                            />
+                            {(mainQuery || mainCategory) && mode !== 'delete' && (
+                                <button type="button" aria-label="Clear main category" onClick={() => { setMainCategory(''); setMainQuery(''); setSubCategory(''); setShowMainList(false); setMainFocus(-1) }} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700">
+                                    <Icon name="x" className="w-4 h-4" title="Clear" />
+                                </button>
                             )}
-                            {category === '__new__' && (
-                                <div className="mt-3 grid grid-cols-1 gap-2">
-                                    <input placeholder="New category name" value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleConfirmNewCategory() }} className="w-full border rounded-lg px-3 py-2" disabled={mode === 'delete'} />
-                                    <div className="text-xs muted">(Creates a main category. To create a subcategory, use Categories → Add subcategory)</div>
-                                    <div className="flex gap-2">
-                                        <button type="button" onClick={handleConfirmNewCategory} className="btn-primary">Add category</button>
-                                        <button type="button" onClick={() => { setCategory(''); setNewCategoryName(''); setNewCategoryParent('') }} className="btn">Cancel</button>
+                            <div aria-hidden={!showMainList} className={`absolute z-20 bg-white dark:bg-gray-800 border rounded mt-1 w-full max-h-60 overflow-auto transition-all duration-200 ease-out transform-gpu ${showMainList ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto' : 'opacity-0 -translate-y-1 scale-95 pointer-events-none'}`}>
+                                <div className="p-2 text-xs muted">Top-level categories</div>
+                                <div>
+                                    {mainVisible.map((n, idx) => (
+                                        <div
+                                            key={n}
+                                            className={`px-3 py-1 hover:bg-gray-100 cursor-pointer ${mainFocus === idx ? 'bg-gray-100' : ''}`}
+                                            onClick={() => { setMainCategory(n); setMainQuery(n); setShowMainList(false); setSubCategory(''); setMainFocus(-1) }}
+                                            onMouseEnter={() => setMainFocus(idx)}
+                                        >
+                                            {n}
+                                        </div>
+                                    ))}
+                                    {/* add-new item is index === mainVisible.length */}
+                                    <div
+                                        className={`px-3 py-1 hover:bg-gray-100 cursor-pointer text-primary ${mainFocus === mainVisible.length ? 'bg-gray-100' : ''}`}
+                                        onClick={() => { setNewCategoryName(mainQuery); handleConfirmNewCategory(null); setShowMainList(false); setMainFocus(-1) }}
+                                        onMouseEnter={() => setMainFocus(mainVisible.length)}
+                                    >
+                                        + Add new "{mainQuery || 'category'}"
                                     </div>
                                 </div>
+                            </div>
+                            {categoryMsg && (
+                                <div className={"text-xs mt-1 " + (categoryMsgType === 'error' ? 'text-red-500' : 'text-green-600')}>{categoryMsg}</div>
                             )}
                         </div>
-                        {categoryMsg && (
-                            <div className={"text-xs mt-1 " + (categoryMsgType === 'error' ? 'text-red-500' : 'text-green-600')}>{categoryMsg}</div>
-                        )}
+                    </label>
+
+                    <label ref={subRef}>
+                        <div className="text-sm muted">Subcategory</div>
+                        <div className="mt-2 relative">
+                            <input
+                                value={subQuery}
+                                onChange={e => { setSubQuery(e.target.value); setSubCategory(''); setShowSubList(true) }}
+                                onFocus={() => setShowSubList(true)}
+                                onKeyDown={e => {
+                                    if (e.key === 'Escape') { setSubCategory(''); setSubQuery(''); setShowSubList(false); setSubFocus(-1); e.stopPropagation(); }
+                                    else if (e.key === 'ArrowDown') {
+                                        e.preventDefault()
+                                        setSubFocus(f => Math.min(f + 1, subVisible.length))
+                                        setShowSubList(true)
+                                    } else if (e.key === 'ArrowUp') {
+                                        e.preventDefault()
+                                        setSubFocus(f => Math.max(f - 1, 0))
+                                    } else if (e.key === 'Enter') {
+                                        e.preventDefault()
+                                        if (subFocus >= 0) {
+                                            if (subFocus < subVisible.length) {
+                                                const sel = subVisible[subFocus]
+                                                setSubCategory(sel); setSubQuery(sel); setShowSubList(false); setSubFocus(-1)
+                                            } else {
+                                                // add new sub
+                                                setNewCategoryName(subQuery || '')
+                                                handleConfirmNewCategory(mainCategory)
+                                                setShowSubList(false)
+                                                setSubFocus(-1)
+                                            }
+                                        } else if (subVisible.length === 1) {
+                                            const sel = subVisible[0]
+                                            setSubCategory(sel); setSubQuery(sel); setShowSubList(false); setSubFocus(-1)
+                                        }
+                                    }
+                                }}
+                                placeholder={mainCategory ? `Search subcategories of ${mainCategory}` : 'Select a main category first'}
+                                className="w-full border rounded-lg px-3 py-2 pr-8"
+                                disabled={mode === 'delete' || !mainCategory || mainCategory === '__new__'}
+                            />
+                            {(subQuery || subCategory) && mode !== 'delete' && (
+                                <button type="button" aria-label="Clear subcategory" onClick={() => { setSubCategory(''); setSubQuery(''); setShowSubList(false); setSubFocus(-1) }} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700">
+                                    <Icon name="x" className="w-4 h-4" title="Clear" />
+                                </button>
+                            )}
+                            <div aria-hidden={!showSubList || !mainCategory} className={`absolute z-20 bg-white dark:bg-gray-800 border rounded mt-1 w-full max-h-60 overflow-auto transition-all duration-200 ease-out transform-gpu ${showSubList && mainCategory ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto' : 'opacity-0 -translate-y-1 scale-95 pointer-events-none'}`}>
+                                <div className="p-2 text-xs muted">Subcategories</div>
+                                <div>
+                                    {subVisible.map((n, idx) => (
+                                        <div
+                                            key={n}
+                                            className={`px-3 py-1 hover:bg-gray-100 cursor-pointer ${subFocus === idx ? 'bg-gray-100' : ''}`}
+                                            onClick={() => { setSubCategory(n); setSubQuery(n); setShowSubList(false); setSubFocus(-1) }}
+                                            onMouseEnter={() => setSubFocus(idx)}
+                                        >
+                                            {n}
+                                        </div>
+                                    ))}
+                                    <div
+                                        className={`px-3 py-1 hover:bg-gray-100 cursor-pointer text-primary ${subFocus === subVisible.length ? 'bg-gray-100' : ''}`}
+                                        onClick={() => { setNewCategoryName(subQuery || ''); handleConfirmNewCategory(mainCategory); setShowSubList(false); setSubFocus(-1) }}
+                                        onMouseEnter={() => setSubFocus(subVisible.length)}
+                                    >
+                                        + Add new "{subQuery || 'subcategory'}" under {mainCategory}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* breadcrumb for selected category */}
+                            {((subCategory && subCategory !== '__new__') || (mainCategory && mainCategory !== '__new__')) && (
+                                <div className="text-xs muted mt-1">{getCategoryPath(subCategory || mainCategory).join(' › ')}</div>
+                            )}
+                        </div>
                     </label>
 
                     <label>
